@@ -1,0 +1,701 @@
+#
+# DHCP Server Configuration file.
+#   see /usr/share/doc/dhcp*/dhcpd.conf.sample
+#   see 'man 5 dhcpd.conf'
+#
+# dhcpd.conf
+#
+# Sample configuration file for ISC dhcpd
+#
+
+# option definitions common to all supported networks...
+#option domain-name "example.org";
+#option domain-name-servers ns1.example.org, ns2.example.org;
+
+# Use this to enble / disable dynamic dns updates globally.
+#ddns-update-style none;
+ddns-update-style ad-hoc;
+# If this DHCP server is the official DHCP server for the local
+# network, the authoritative directive should be uncommented.
+authoritative;
+
+# Use this to send dhcp log messages to a different log file (you also
+# have to hack syslog.conf to complete the redirection).
+log-facility local7;
+
+#class "cm" {
+#match if substring(option vendor-class-identifier,0,6) = "docsis";
+#}
+
+# No service will be given on this subnet, but declaring it helps the 
+# DHCP server to understand the network topology.
+
+subnet 10.1.1.0 netmask 255.255.255.0 {
+}
+
+# This declaration allows BOOTP clients to get dynamic addresses,
+# which we don't really recommend.
+
+#subnet 10.254.239.32 netmask 255.255.255.224 {
+#  range dynamic-bootp 10.254.239.40 10.254.239.60;
+#  option broadcast-address 10.254.239.31;
+#  option routers rtr-239-32-1.example.org;
+#}
+
+## CM the following options are to enable cable source-verify dhcp authoritative to work on Arris CMTS
+
+option agent.circuit-id code 82 = string;
+stash-agent-options true;
+allow leasequery;
+
+## END of  cable source-verify dhcp authoritative options
+
+## CM removed 130927   include "/etc/dhcp/MishBridged.hosts";
+## ROL removed 130315  include "/etc/dhcp/MishManual.hosts";
+## CM removed 130927   include "/etc/dhcp/Mish7.hosts";
+
+#################################################
+###           New DHCP Configuration          ###
+### This Server is Primary for the Mish site. ###
+#################################################
+
+
+# EF 150608 These are Clients on point to points that are blocked for non payment or put into disconnection:
+
+host Client1 { hardware ethernet 00:0c:42:31:62:52; deny booting; } # EF Blocked 14514
+host Client2 { hardware ethernet 00:15:6D:33:18:2F; deny booting; } # EF Blocked 19050
+host Client3 { hardware ethernet 00:15:6D:33:12:CF; deny booting; } # EF Blocked 14810
+host Client4 { hardware ethernet 00:0c:42:63:48:42; deny booting; } # EF Blocked 16513
+host Client5 { hardware ethernet 00:15:6D:33:12:3D; deny booting; } # EF Blocked 18011
+###########
+#         #
+# BRIDGED #
+#         #
+###########          
+
+
+shared-network Mish-Bridged {
+
+###         Slieve Mish Public DHCP Range           ###
+### 196.0  -> 196.15 is Reserved and ACL protected  ###
+### 196.16 -> 196.20 is Reserved for Testing        ###
+### 196.21 -> 196.64 is for static DHCP assignments ###
+### 198.0  -> 198.15 is Reserved and ACL protected  ###
+### 198.16 -> 198.20 is Reserved for Testing        ###
+
+        subnet 192.168.128.0 netmask 255.255.248.0 {
+#                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option domain-name-servers 8.8.8.8, 212.113.0.3;
+                option routers 192.168.128.2;
+                option broadcast-address 192.168.131.255;
+                default-lease-time 90000;
+                max-lease-time 90000;
+		#pool {		### Temporary Pool as there are not enough Public IP addresses
+        	#  	range 192.168.128.20 192.168.128.60;
+        	#   	allow unknown clients;			### Commented out Pool Declaration so as not to mislead dhcpd-pools. JB 20121217 ###
+		#  	deny known clients;
+		# 	#deny all clients;
+	        # }
+	} ### current GiAddr on Mish
+
+#
+# 3-aug-2013 rol reduce from /24 to /25
+#
+## Subnet for P2P clients set statically
+
+	subnet 10.1.10.0 netmask 255.255.255.192 {
+                option domain-name-servers 8.8.8.8, 212.113.0.3;
+                option routers 10.1.10.1;
+                option broadcast-address 10.1.1.255;
+#                default-lease-time 90000;
+#                max-lease-time 90000;
+                default-lease-time 90000;
+                max-lease-time 90000;
+		include "/etc/dhcp/mish_10.1.10.classes";
+        }
+
+
+## ROL 150730 removed subnet 88.151.30.192 netmask 255.255.255.192 { pool { range 88.151.30.200 88.151.30.254 }}
+
+## CM 15-Jan-2014 New subnet was part of /24 for MishCASA South
+	 
+	subnet 37.128.198.128 netmask 255.255.255.128 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 37.128.198.129;
+                option broadcast-address 37.128.198.255;
+#                default-lease-time 90000;
+#                max-lease-time 90000;
+                default-lease-time 90000;
+                max-lease-time 90000;
+                #include "/etc/dhcp/mish_37.128.198_gustavo.classes";
+                ## CM this pool for Gustavo, its a dummy pool, ask me about it
+                pool {
+			range 37.128.198.135 37.128.198.139;
+			deny unknown clients;
+			deny all clients;
+		}
+
+                pool {
+                         range 37.128.198.140 37.128.198.254; ## CM 151029 reduced pool by 5 addresses to faciliate static IP for Gustavo
+                         allow unknown clients;
+                         deny known clients;
+			 #deny all clients; ##
+		
+                 }
+        }
+
+
+### 150519 ROL removed subnet 185.11.66.224 netmask 255.255.255.224 { pool { range 185.11.66.231 185.11.66.254; } }
+
+        subnet 81.31.213.0 netmask 255.255.255.192 {
+                option domain-name-servers 8.8.8.8, 212.113.0.3;
+                option routers 81.31.213.1;
+                option broadcast-address 81.31.213.63;
+#                default-lease-time 90000;
+#                max-lease-time 90000;
+                default-lease-time 90000;
+                max-lease-time 90000;
+                pool {
+                        range 81.31.213.8 81.31.213.62;
+                        allow unknown clients;
+ 			deny known clients;
+			#deny all clients; ##
+                }
+        }
+	
+	## CM 13-Oct-03 Reduced this to a /24
+        subnet 37.128.196.0 netmask 255.255.255.0 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 37.128.196.1;
+                option broadcast-address 37.128.196.255;
+#                default-lease-time 90000;
+#                max-lease-time 90000;
+                default-lease-time 90000;
+                max-lease-time 90000;
+		include "/etc/dhcp/mish_37.128.196.classes";
+        	pool {
+        	       	#range 37.128.196.67 37.128.196.254;  ## Start of subnet used for STATIC from 10
+        	       	range 37.128.196.67 37.128.196.127;  ## CM 160915 IPSPACE Reduced pool to free up 37.128.196.128/25
+	                allow unknown clients;
+			deny known clients;
+			#deny all clients; ##
+        	}
+        }
+
+
+## CM 150828 New subnet
+	subnet 37.128.197.192 netmask 255.255.255.192 {
+		option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 37.128.197.193;  ## WAN2 
+                option broadcast-address 37.128.197.255;
+#                default-lease-time 90000;
+#                max-lease-time 90000;
+                default-lease-time 90000;
+                max-lease-time 90000;
+		pool {
+			range 37.128.197.198 37.128.197.254; ## 195 to 197 reserved for CMTS and Mull1!! Keep forgetting Mull is same vLAN
+			allow unknown clients;
+			deny known clients;
+			#deny all clients;
+		}
+	}
+
+## ROL 150814 freed up subnet 37.128.197.0 netmask 255.255.255.128 { }
+
+## ROL 150730 removed subnet 37.128.197.192 netmask 255.255.255.192 { pool { range 37.128.197.200 37.128.197.254; } } 
+
+} ### End of shared-network Mish-Bridged
+
+
+###########
+#         #
+# uBR10K  #
+#         #
+###########
+
+
+shared-network Mish10kUBR-NorthV {
+## Bundle 1
+
+###         MishCMTS7-uBR Public DHCP Range         ###
+###  28.0  ->  28.15 is Reserved and ACL protected  ###
+###  28.16 ->  28.20 is Reserved for Testing        ###
+###  28.21 ->  28.49 is for static DHCP assignments ###
+
+        subnet 172.21.12.0 netmask 255.255.252.0 { ### declare the MTA subnet as this is 1st secondary = giaddr
+               }
+	
+	subnet 172.26.10.0 netmask 255.255.254.0 {
+		option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 172.26.10.1;
+		option broadcast-address 172.21.11.255;
+		default-lease-time 90000;
+                max-lease-time 90000;
+		#pool {
+			#range 172.26.10.10 172.26.10.190;  ##CM 160915 Temp enabled until 88.151.29.0/25 free
+			#allow unknown clients;
+                        #deny known clients;
+			#deny all clients;
+		#}
+	}
+
+	subnet 88.151.28.0 netmask 255.255.254.0 {
+        	option domain-name-servers 8.8.8.8, 8.8.4.4;
+	        option routers 88.151.28.1;
+        	option broadcast-address 88.151.28.255;
+	        default-lease-time 90000;
+        	max-lease-time 90000;
+#	        default-lease-time 3600;
+#        	max-lease-time 3600;
+		include "/etc/dhcp/mishN_88.151.28.classes";
+		pool {
+#	        	range 88.151.28.30 88.151.29.254;  ## 130918 CM Static is from .6 to .29
+###
+### 150513 ROL - NB top /25 of this subnet 88.151.29.128-254 now allocated to Wmtn4 on 10.1.1.75
+### Don't increase pool beyond 88.151.29.127 !!!
+###
+	        	#range 88.151.28.30 88.151.29.127;  ## 150320 ROL reducedd pool to 29.127.
+#	        	range 88.151.28.30 88.151.28.254;   ## 160914  CM reduced pool to 28.254 88.151.29.0/25 will be free.
+	        	range 88.151.28.30 88.151.28.222;   ## 161014 ROL reclaimed 88.151.28.224/27
+		        allow unknown clients;
+			deny known clients;
+			#deny all clients;
+
+        	}
+	}
+
+
+	subnet 81.31.209.128 netmask 255.255.255.224 {
+		option domain-name-servers 8.8.8.8, 8.8.4.4;
+		option routers 81.31.209.129;
+		option broadcast-address 81.31.209.159;
+		default-lease-time 90000;
+		max-lease-time 90000;
+		pool {
+			range 81.31.209.132 81.31.209.158;
+			allow unknown clients;
+			deny known clients;
+			#deny all clients;
+		}
+	}
+
+## CM 14-04-17 31.186.33.0 being removed from pnet network
+#
+        subnet 31.186.33.128 netmask 255.255.255.224 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 31.186.33.129;
+                option broadcast-address 31.186.33.159;
+	        default-lease-time 90000;
+        	max-lease-time 90000;
+#	        default-lease-time 3600;
+#        	max-lease-time 3600;
+                #pool {
+                #        range 31.186.33.132 31.186.33.158; 
+                #        allow unknown clients;
+                #        deny known clients;
+	#		#deny all clients;
+                #}
+        }
+
+### Temp Private IP Range Due to not enough Public IP addresses ###
+### Might replace this with a </25 Public Range soon. JB 20120223
+	        	
+} ### end of shared-network Mish10kUBR-North
+
+shared-network Mish10kUBR-SouthV {
+## Bundle 2
+        subnet 172.21.36.0 netmask 255.255.255.0 { ### declare the MTA subnet as this is 1st secondary = giaddr
+               }
+
+        subnet 172.26.6.0 netmask 255.255.254.0 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 172.26.6.1;
+                option broadcast-address 172.26.7.255;
+                default-lease-time 90000;
+                max-lease-time 90000;
+###
+### 150715 ROL added private pool
+###
+		#pool {
+                        #range 172.26.6.20 172.26.6.60;
+#                       allow unknown clients;
+	                #deny all clients;
+                #}
+        }
+
+
+### ROL 161017 Reclaiming - subnet/pool removed 81.31.213.64/26, 81.31.213.68-126
+
+        ## 131003 12:00hrs  CM New /26 public range for Mish8 South
+        subnet 37.128.197.128 netmask 255.255.255.192 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers  37.128.197.129;  ## On the casa for South Bundle
+                option broadcast-address 37.128.197.191;
+		default-lease-time 90000;
+		max-lease-time 90000;
+#                default-lease-time 90000;
+#                max-lease-time 90000;
+                pool {
+                        range 37.128.197.135 37.128.197.190;
+#                        deny all clients;
+                        allow unknown clients;
+                        deny known clients;
+                }
+        }
+
+        subnet 81.31.212.128 netmask 255.255.255.128 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 81.31.212.129;
+                option broadcast-address 81.31.212.255;
+		default-lease-time 90000;
+		max-lease-time 90000;
+#                default-lease-time 90000;
+#                max-lease-time 90000;
+                include "/etc/dhcp/mishS_81.31.212.classes";
+                pool {
+                        range 81.31.212.150 81.31.212.254;  ## .6 to .34 reserved for STATIC
+#                        deny all clients;
+                        allow unknown clients;
+                        deny known clients;
+
+                 }
+        }
+        ## CM 15-Jan-2014 This range was split into 2 and the bottom half of subnet assigned to Mish Bridged.
+        subnet 37.128.198.0 netmask 255.255.255.128 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 37.128.198.1;
+                option broadcast-address 37.128.198.127;
+		default-lease-time 90000;
+		max-lease-time 90000;
+#                default-lease-time 90000;
+#                max-lease-time 90000;
+                pool {
+                         range 37.128.198.6 37.128.198.126; ## CM Used to start at .20
+                         #deny all clients;
+                         allow unknown clients;
+                         #deny known clients;
+                 }
+        }
+} ### end of shared-network Mish10kUBR-SouthV {
+
+
+shared-network Mish10kUBR-EastV {
+# Bundle 4
+
+
+## CM 11-04-17 New /28 range needed
+
+        subnet 88.151.29.96 netmask 255.255.255.240 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 88.151.29.97;
+                option broadcast-address 88.151.29.111;
+                #default-lease-time 3600;
+                #max-lease-time 3600;
+                default-lease-time 90000;
+                max-lease-time 90000;
+		pool {
+                        range 88.151.29.98 88.151.29.110; 
+                        allow unknown clients;
+			deny known clients;
+			#deny all clients;
+                }
+        }
+
+
+
+
+        subnet 172.26.8.0 netmask 255.255.254.0 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 172.26.8.1;
+                option broadcast-address 172.26.9.255;
+                default-lease-time 90000;
+                max-lease-time 90000;
+###
+### 150519 ROL removed private pool
+                #pool {
+                #        range 172.26.8.20 172.26.8.30;
+                #        allow unknown clients;
+         #		deny all clients;
+                #}
+        }
+
+	subnet 10.1.16.0 netmask 255.255.255.0 {  ## For PtP
+		option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 10.1.16.1;
+                option broadcast-address 172.26.9.255;
+                default-lease-time 90000;
+                max-lease-time 90000;		
+		include "/etc/dhcp/mishE_10.1.16.classes";
+		}
+
+	## CM 130909 New IP range
+	subnet 185.11.66.64 netmask 255.255.255.192 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 185.11.66.65;
+                option broadcast-address 185.11.66.127;
+                default-lease-time 90000;
+                max-lease-time 90000;
+                #pool {
+                #        range 185.11.66.68 185.11.66.126;
+                #        allow unknown clients;
+	#		 deny known clients;
+        #                #deny all clients;
+         #       }
+        }
+
+        subnet 88.151.24.128 netmask 255.255.255.128 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 88.151.24.129;
+                option broadcast-address 88.151.24.255;
+                #default-lease-time 3600;
+                #max-lease-time 3600;
+                default-lease-time 90000;
+                max-lease-time 90000;
+		include "/etc/dhcp/mishE_88.151.24.classes";
+		pool {
+                        range 88.151.24.130 88.151.24.254; 
+                        allow unknown clients;
+			deny known clients;
+			#deny all clients;
+                }
+        }
+
+## ROL 161012 reclaiming removed subnet/pool 185.11.66.224/27, 185.11.66.231-254
+
+
+### CM 160920 new subnet 37.128.196.128/28 added (reclaimed from Mish Bridged)
+
+	subnet 37.128.196.128 netmask 255.255.255.224 {
+		option domain-name-servers 8.8.8.8, 212.113.0.3;
+		option routers 37.128.196.129; ## On Mish10k
+		option broadcast-address  255.255.255.159;
+		default-lease-time 90000; 
+		max-lease-time 90000;
+		pool {
+			range 37.128.196.130 37.128.196.158;
+			allow unknown clients;
+			deny known clients;
+			#deny all clients;
+		}
+	}
+}## End shared network Mish10kUBR-East
+
+shared-network Mish10kUBR-Debug {
+
+
+        subnet 10.1.200.0 netmask 255.255.255.0 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 10.1.200.1;
+                option broadcast-address 10.1.200.255;
+                default-lease-time 90000;
+                max-lease-time 90000;
+###
+### 150715 ROL added private pool
+###
+                pool {
+                        range 10.1.200.10 10.1.200.20;
+                       allow unknown clients;
+#                       deny all clients;
+                }
+        }
+}
+
+
+#####################
+#                   #
+#  Mish10K Horiz    #
+#                   #
+#####################
+
+shared-network Mish10k-Hor {
+subnet 172.21.0.0 netmask 255.255.255.0 {} ## Mish9 GiAddr
+
+        subnet 192.168.156.0 netmask 255.255.254.0 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 192.168.156.1; ## On Mish10k uBR Bundle 3
+                option broadcast-address 192.168.157.255;
+                default-lease-time 90000;
+                max-lease-time 90000;
+###160322 ROL adding back because of DOS attack
+###150804 ROL increasing temp as 10kUBR does not permit overlapping subnets.
+###150519 ROL removing - lets not start usnig private IP space here..
+###150628 ROL using 10 private temp - need to add a bigger subnet here
+###150630 CM Increased pool above by 10.
+#                pool {
+#                       range 192.168.156.10 192.168.156.60; ## CM Extended pool to 192.168.156.60
+#                        deny all clients;
+#                       deny known clients;
+#                       allow unknown clients;
+#                }
+        }
+
+
+## CM 13-04-17 Replacing 185.11.64.0/26 with 31.186.39.64 /26
+
+	subnet 31.186.39.64 netmask 255.255.255.192 {
+		option domain-name-servers 8.8.8.8, 212.113.0.3;
+		option routers 31.186.39.65; ## On Mish10K ubr bundle 3
+		option broadcast-address 185.11.64.127;
+		default-lease-time 90000;
+		max-lease-time 90000;
+		pool {
+			range 31.186.39.68 31.186.39.126;
+			allow unknown clients;
+                        deny known clients;
+			#deny all clients;
+		}
+	}
+
+        subnet 88.151.26.192 netmask 255.255.255.224 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers  88.151.26.193; ## On Mish10k uBR Bundle 3
+                option broadcast-address  88.151.26.223;
+                default-lease-time 90000;
+                max-lease-time 90000;
+                pool {
+                        range  88.151.26.195  88.151.26.222;
+                        deny known clients;
+                        allow unknown clients;
+                        #deny all clients;
+                }
+        }
+
+        subnet 88.151.26.32 netmask 255.255.255.224 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers  88.151.26.33; ## On Mish10k uBR Bundle 3
+                option broadcast-address  88.151.26.63;
+                default-lease-time 90000;
+                max-lease-time 90000;
+                pool {
+                        range  88.151.26.35  88.151.26.62;
+                        deny known clients;
+                        allow unknown clients;
+			#deny all clients;
+                }
+        }
+
+        subnet 31.186.39.224 netmask 255.255.255.224 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers  31.186.39.225; ## On Mish10k uBR Bundle 3
+                option broadcast-address  31.186.39.255;
+                default-lease-time 90000;
+                max-lease-time 90000;
+                pool {
+                        range  31.186.39.227  31.186.39.254;
+                        deny known clients;
+                        allow unknown clients;
+			#deny all clients;
+                }
+        }
+
+## CM 160324 New Subnet 37.128.199.0/27
+## CM 161102 This subnet being replaced with 81.31.213.64/26 remove when pools are free.
+	subnet 37.128.199.0 netmask 255.255.255.192 {  
+		option domain-name-servers 8.8.8.8, 212.113.0.3;
+		option routers 37.128.199.1; ## On Mish10K Glue IP of CMTS 192.168.2.213
+		option broadcast-address 37.128.199.63;
+		default-lease-time 90000;
+		max-lease-time 90000;
+		pool {
+			range 37.128.199.10 37.128.199.62;
+			deny known clients;
+			allow unknown clients;
+			#deny all clients;
+		}
+	}
+
+## CM 19-04-16 new 37.128.199.64/27 added
+	subnet 37.128.199.64 netmask 255.255.255.224 {
+		option domain-name-servers 8.8.8.8, 212.113.0.3;
+		option routers 37.128.199.65; ## On Mish10K Glue IP of CMTS 192.168.2.213
+		option broadcast-address 37.128.199.95;
+		default-lease-time 90000;
+		max-lease-time 90000;
+		pool {
+			range 37.128.199.66 37.128.199.94; ## Note 37.128.199.96/27 is used for Knock Bridged
+	        	deny known clients;
+			allow unknown clients;
+			#deny all clients; 
+		}
+	}
+
+## CM 16-10-05 new /26 to replaced smaller subnets above. Note the 81.31.210.0/24 subnet exists on Coolg3
+	subnet 81.31.210.192 netmask 255.255.255.192 {
+		option domain-name-servers 8.8.8.8, 212.113.0.3;
+		option routers 81.31.210.193;  ## CM on Mish10k int bu 3 (note 81.31.210.0/24 is on Coolg3)
+		option broadcast-address 81.31.210.254;
+		default-lease-time 90000;
+		max-lease-time 90000;
+		pool {
+			range 81.31.210.196 81.31.210.254;
+			deny known clients;
+			allow unknown clients;
+			#deny all clients;
+		}
+	}
+
+## CM 161102 New subnet 81.31.213.64/26
+	subnet 81.31.213.64 netmask 255.255.255.192 {
+		option domain-name-servers 8.8.8.8, 212.113.0.3;
+		option routers 81.31.213.65; # On CMTS Blackholed by LAN1
+		option broadcast-address 81.31.213.127;
+		default-lease-time 90000;
+		max-lease-time 90000;
+		pool {
+			range 81.31.213.66 81.31.213.126;
+			deny known clients;
+			allow unknown clients;
+			#deny all clients;
+		}
+	}
+
+} ## End of shared-network Mish10kHor
+
+# Hosts which require special configuration options can be listed in
+# host statements.   If no address is specified, the address will be
+# allocated dynamically (if possible), but the host-specific information
+# will still come from the host declaration.
+
+#host passacaglia {
+#  hardware ethernet 0:0:c0:5d:bd:95;
+#  filename "vmunix.passacaglia";
+#  server-name "toccata.fugue.com";
+#}
+
+# Fixed IP addresses can also be specified for hosts.   These addresses
+# should not also be listed as being available for dynamic assignment.
+# Hosts for which fixed IP addresses have been specified can boot using
+# BOOTP or DHCP.   Hosts for which no fixed address is specified can only
+# be booted with DHCP, unless there is an address range on the subnet
+# to which a BOOTP client is connected which has the dynamic-bootp flag
+# set.
+#host fantasia {
+#  hardware ethernet 08:00:07:26:c0:a5;
+#  fixed-address fantasia.fugue.com;
+#}
+
+# You can declare a class of clients and then do address allocation
+# based on that.   The example below shows a case where all clients
+# in a certain class get addresses on the 10.17.224/24 subnet, and all
+# other clients get addresses on the 10.0.29/24 subnet.
+
+#class "foo" {
+#  match if substring (option vendor-class-identifier, 0, 4) = "SUNW";
+#}
+
+#shared-network 224-29 {
+#  subnet 10.17.224.0 netmask 255.255.255.0 {
+#    option routers rtr-224.example.org;
+#  }
+#  subnet 10.0.29.0 netmask 255.255.255.0 {
+#    option routers rtr-29.example.org;
+#  }
+#  pool {
+#    allow members of "foo";
+#    range 10.17.224.10 10.17.224.250;
+#  }
+#  pool {
+#    deny members of "foo";
+#    range 10.0.29.10 10.0.29.230;
+#  }
+#}

@@ -1,0 +1,730 @@
+#
+# DHCP Server Configuration file.
+#   see /usr/share/doc/dhcp*/dhcpd.conf.sample
+#   see 'man 5 dhcpd.conf'
+#
+# dhcpd.conf
+#
+# Sample configuration file for ISC dhcpd
+#
+
+# option definitions common to all supported networks...
+#option domain-name "example.org";
+#option domain-name-servers ns1.example.org, ns2.example.org;
+
+# Use this to enble / disable dynamic dns updates globally.
+#ddns-update-style none;
+# dns-update-style ad-hoc;
+
+# If this DHCP server is the official DHCP server for the local
+# network, the authoritative directive should be uncommented.
+
+
+# Use this to send dhcp log messages to a different log file (you also
+# have to hack syslog.conf to complete the redirection).
+
+## CM the following options are to enable cable source-verify dhcp authoritative to work on Arris CMTS
+
+option agent.circuit-id code 82 = string;
+stash-agent-options true;
+authoritative;
+allow leasequery;
+
+## END of  cable source-verify dhcp authoritative options
+
+log-facility local7;
+
+################################
+### STATIC HOST INCLUDES     ###
+################################
+
+#include "/etc/dhcp/SlievebManual.hosts";      CM 13-oct-01 This is now part of /etc/dhcp/slieveb_88.151.27.classes & slieveb_88.151.26.classes
+#include "/etc/dhcp/BallinGManual.hosts";      CM 13-oct-01 This is now part of /etc/dhcp/balling.classes
+#include "/etc/dhcp/JohnswellManual.hosts";    CM 13-oct-01 This is now part of /etc/dhcp/johns.classes
+#include "/etc/dhcp/ForthBridged.hosts";
+#include "/etc/dhcp/Forth37.128.192.hosts"; #Forth-Bridged    CM 13-oct-01 This is now part of /etc/dhcp/Forth37.128.192.classes
+#include "/etc/dhcp/Forth37.128.194.hosts"; #Forth-Casa       CM 13-oct-01 This is now part of /etc/dhcp/Forth37.128.194.classes
+#include "/etc/dhcp/CoolGManual.hosts";        CM  13-oct-01 This is now part of /etc/dhcp/coolg.classes
+#include "/etc/dhcp/WhiteManual.hosts";        CM  13-oct-01 This is now part of /etc/dhcp/WhiteManual_88.151.30.classes & WhiteManual_37.128.193.classes
+#include "/etc/dhcp/MtGabManual.hosts";        CM  13-oct-01 This is now part of /etc/dhcp/MtGabManual.classes
+#include "/etc/dhcp/ClaraManual.hosts";        CM  13-oct-01 This is now part of /etc/dhcp/clara_88.151.25.classes
+#include "/etc/dhcp/WhiteCASA.hosts";          CM  13-oct-01 This is now part of /etc/dhcp/WhiteCASA.classes
+#include "/etc/dhcp/temp.hosts";
+# include "/etc/dhcp/crushum.classes"; # This is for the test router for SAF VLAN testing
+# No service will be given on this subnet, but declaring it helps the
+# DHCP server to understand the network topology.
+
+
+### AWS SUBNET DECLARATION
+subnet 172.31.0.0 netmask 255.255.0.0 {}
+
+## PNET SUBNET DECLARATION
+subnet 10.1.1.0 netmask 255.255.255.0 {
+}
+
+# This declaration allows BOOTP clients to get dynamic addresses,
+# which we don't really recommend.
+
+#subnet 10.254.239.32 netmask 255.255.255.224 {
+#  range dynamic-bootp 10.254.239.40 10.254.239.90000;
+#  option broadcast-address 10.254.239.31;
+#  option routers rtr-239-32-1.example.org;
+#}
+
+#################################################
+###           New DHCP Configuration          ###
+### This Server is Primary for 'Other' sites. ###
+###           ie. Not Knock or Mish!!         ###
+#################################################
+
+
+## CM 150309 These are clients connected to Broadford AP. One client is causing an issue so DHCP blocked for the following MACS:
+
+# host Client1 { hardware ethernet 00:0c:42:64:8d:66; deny booting; }  This is the Microtec AP.
+host Client2 { hardware ethernet 00:27:22:3e:98:61; deny booting; } # EF Blocked disco id 18568
+#host Client3 { hardware ethernet 00:15:6d:b0:31:75; deny booting; }
+#host Client4 { hardware ethernet 00:27:22:3e:98:F1; deny booting; }
+#host Client5 { hardware ethernet 00:15:6d:b0:30:07; deny booting; }
+#host Client6 { hardware ethernet 00:15:6d:b0:30:54; deny booting; }
+#host Client7 { hardware ethernet 00:0c:42:78:c3:77; deny booting; }
+#host Client8 { hardware ethernet dc:9f:db:e4:88:1f; deny booting; }
+#host Client9 { hardware ethernet 00:15:6d:b0:31:bb; deny booting; }
+#host Client10 { hardware ethernet 00:15:6d:b0:30:0d; deny booting; }
+#host Client11 { hardware ethernet 00:15:6d:b0:30:57; deny booting; }
+#host Client12 { hardware ethernet dc:9f:db:92:5b:5a; deny booting; }
+host Client13 { hardware ethernet dc:9f:db:92:5c:c6; deny booting; }
+host Client14 { hardware ethernet DC:9F:DB:E4:88:1F; deny booting; } # EF Blocked disco id 22107
+
+## Enet FTH
+
+## CM 150211 New IP range fibre modem IPs are assigned statically, hence pools are commented out.
+shared-network enetFTH  {  ## CM Removed the '-' so pings are not sent about this.
+
+subnet 185.11.66.192 netmask 255.255.255.224 {
+        option domain-name-servers 8.8.8.8, 8.8.4.4;
+        option routers 185.11.66.193; #On CCR1 VLAN 682
+        #option routers 185.11.66.194; #On WAN1 ge-0/0/1 unit 682
+        option broadcast-address 185.11.66.223;
+        	default-lease-time 90000; #CM Short proper lease time as service is live
+        	max-lease-time 90000;
+		include "/etc/dhcp/enetFTH-Residential.classes";
+                        #pool {
+                        #range 185.11.66.196 185.11.66.222;
+                        #deny known clients;
+                        #allow unknown clients;
+#			deny all clients;
+       	                #}
+	}
+
+## Below not working properly, unable to ping Calix. 
+subnet 87.32.57.52 netmask 255.255.255.252 {
+        option domain-name-servers 8.8.8.8, 8.8.4.4;
+        option routers 87.32.57.53; #On LAN1 ge-0/0/2 unit 682
+        option broadcast-address 87.32.57.55;
+                default-lease-time 90000;  #10 mins for testing
+                max-lease-time 90000;
+		include "/etc/dhcp/enetFTH-Schools.classes";
+                #pool {
+                #       range 87.32.57.54;
+		       #deny all clients;
+                       #deny known clients;
+                #       allow unknown clients;
+                #}
+	}
+
+subnet 185.11.64.192 netmask 255.255.255.252 {
+	option domain-name-servers 8.8.8.8, 8.8.4.4;
+	option routers 185.11.64.193; #On LAN1 ge-0/0/2 unit 682
+	option broadcast-address 185.11.64.195;
+		default-lease-time 90000;  #10 mins for testing
+		max-lease-time 90000;
+		include "/etc/dhcp/enet-Test.classes";
+		#pool {
+		#	range 185.11.64.194;
+		#	allow unknown clients;
+		#	allow known clients;
+		#}
+	}
+
+}## End of FTH SharedNetwork
+
+shared-network JoeMonks-MtGab  {
+	subnet 192.168.254.0 netmask 255.255.255.0 {
+		option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 192.168.254.1;  ## On LAN2
+		option broadcast-address 192.168.254.255;
+		default-lease-time 90000;
+		max-lease-time 90000;
+		pool {
+			range 192.168.254.2 192.168.254.14;
+			allow unknown clients;
+		     }
+
+	}
+} # End shared network JoeMonks-MtGab
+
+
+shared-network Forth-Bridged {
+
+###    Forth Mountain Bridged Public DHCP Range     ###
+### 192.0  -> 192.15 is Reserved and ACL protected  ###
+### 192.17 -> 192.20 is Reserved for Testing        ###
+### 192.21 -> 192.64 is for static DHCP assignments ###
+
+        subnet 192.168.136.0 netmask 255.255.255.0 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 192.168.136.2;
+                option broadcast-address 192.168.136.255;
+                default-lease-time 90000;
+                max-lease-time 90000;
+###
+### 150519 ROL removed private Pool
+###
+#                pool {
+##                        range 192.168.136.20 192.168.136.60;
+#                        range 192.168.136.20 192.168.136.40; ### ROL 150513 reduced pool as so many private not required.  CM Using for crushum docsis now.
+#                        allow unknown clients;
+#                }
+	
+        } ### current GiAddr on Forth
+
+        subnet 37.128.192.0 netmask 255.255.255.0 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 37.128.192.1;
+                option broadcast-address 37.128.192.255;
+                default-lease-time 90000;
+                max-lease-time 90000;
+		include "/etc/dhcp/Forth37.128.192.classes";
+                pool {
+#                        range 37.128.192.45 37.128.192.254;  ## .10 to .44 reserved for STATIC
+                        #range 37.128.192.40 37.128.192.254;  ## 150519 ROL .10 to .39 reserved for STATIC
+                        range 37.128.192.40 37.128.192.191;  ## CM reduced to free up 37.128.192.192/26
+                        allow unknown clients;
+			deny known clients;
+                }
+        }
+	
+        subnet 88.151.30.192 netmask 255.255.255.192 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 88.151.30.193;
+                option broadcast-address 88.151.30.255;
+                default-lease-time 90000;
+                max-lease-time 90000;
+#                pool {
+#                        range 88.151.30.200 88.151.30.254;
+#                        allow unknown clients;
+#			deny known clients;
+#                }
+        }
+
+	# CM 130820 New pool deployed
+        subnet 88.151.25.160 netmask 255.255.255.224 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 88.151.25.161;
+                option broadcast-address 88.151.25.191;
+                default-lease-time 90000;
+                max-lease-time 90000;
+                pool {
+#                        range 88.151.25.170 88.151.25.190;
+                        range 88.151.25.164 88.151.25.190; ### 150519 ROL increase pool by 6 addresses.  ## CM 160324 Note 88.151.25.164 is an IP on Fmtn5
+                        allow unknown clients;
+			deny known clients;
+                }
+        }
+} ### End of shared-network Forth-Bridged
+
+shared-network Forth-Casa {
+
+###       Forth Mountain Public DHCP Range          ###
+### 194.0  -> 194.15 is Reserved and ACL protected  ###
+### 194.17 -> 194.20 is Reserved for Testing        ###
+### 194.21 -> 194.64 is for static DHCP assignments ###
+
+## CM 07-02-14 New Private Range
+#
+subnet 172.21.60.0 netmask 255.255.252.0 {} ## GiAddr
+
+       subnet 192.168.201.0 netmask 255.255.255.0 {
+               option domain-name-servers 8.8.8.8, 8.8.4.4;
+               option domain-name-servers 8.8.8.8, 212.113.0.3;
+               option routers 192.168.201.1;  ## On the ForthCASA
+               option broadcast-address 192.168.201.255;
+               default-lease-time 90000;  ## CM 141006 Lease-time reduced as 31.186.33.224/27 pending.
+               max-lease-time 90000;
+               #pool {
+               #        range 192.168.201.16 192.168.201.32;
+               #        allow unknown clients;
+	#	       deny known clients;   ## So that someone from a 'classes Static IP' won't get IP from this pool
+         #      }
+       }
+
+        subnet 37.128.194.0 netmask 255.255.254.0 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 37.128.194.1;
+                option broadcast-address 37.128.195.255;
+                default-lease-time 90000;
+                max-lease-time 90000;
+		include "/etc/dhcp/Forth37.128.194.classes";
+                pool {
+#                        range 37.128.194.42 37.128.195.254;  ## .10 to .41 reserved for STATIC
+#                        range 37.128.194.42 37.128.195.223;  ## ROL 150513 reduced pool to free up 32 addresses.
+                        range 37.128.194.42 37.128.195.159;  ## ROL 160229 reduced pool
+                        allow unknown clients;
+			deny known clients;
+                }
+        }
+
+        subnet 88.151.24.64 netmask 255.255.255.224 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 88.151.24.65;
+                option broadcast-address 88.151.24.95;
+                default-lease-time 90000;
+                max-lease-time 90000;
+                pool {
+                        range 88.151.24.68 88.151.24.94; ### maximum here is to 94
+                        allow unknown clients;
+			deny known clients;
+                }
+        }
+} ### End of shared-network Forth-Casa
+
+shared-network Slieveboy-BSR7 {
+
+subnet 172.21.145.0 netmask 255.255.255.0 {} ### BSR GIAddr
+### CM 160322 Enabled due to DDOS attack
+
+	subnet 192.168.216.0 netmask 255.255.252.0 {
+		option routers 192.168.216.1; ## On Slieveb7 BSR
+		option broadcast-address 192.168.219.255;
+		option domain-name-servers 8.8.8.8, 212.113.0.3;
+		default-lease-time 90000;
+		max-lease-time 90000;
+			#pool {
+			#	range 192.168.216.1 192.168.216.254;
+			#	allow unknown clients;
+	#			deny all clients;
+			#}
+		}
+
+## CM 19-04-16 new subnet
+	subnet 37.128.199.128 netmask 255.255.255.128 {
+		option domain-name-servers 8.8.8.8, 212.113.0.3;
+		option routers 37.128.199.129; ## On SB7 BSR int loopback 1
+		option broadcast-address 37.128.199.255;
+		default-lease-time 90000;
+		max-lease-time 90000;
+		pool {
+			range 37.128.199.132 37.128.199.254;
+			allow unknown clients;
+			deny known clients;
+			#deny all clients;
+		}
+	}
+
+        subnet 88.151.31.0 netmask 255.255.255.0 {
+                 option domain-name-servers 8.8.8.8, 8.8.4.4;
+                 option routers 88.151.31.1;
+                 option broadcast-address 88.151.31.255;
+                 default-lease-time 90000;
+                 max-lease-time 90000;
+                        pool {
+                         range 88.151.31.16 88.151.31.254;
+                         allow unknown clients;
+                         deny known clients;
+			 #deny all clients;
+                  }
+         }
+
+        subnet 88.151.27.128 netmask 255.255.255.224 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 88.151.27.129;
+                option broadcast-address 88.151.27.159;
+                default-lease-time 90000;
+                max-lease-time 90000;
+                include "/etc/dhcp/slieveb_88.151.27.classes";
+        }
+
+        subnet 88.151.26.224 netmask 255.255.255.224 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 88.151.26.225;
+                option broadcast-address 88.151.26.255;
+                default-lease-time 90000;
+                max-lease-time 90000;
+                include "/etc/dhcp/slieveb_88.151.26.classes";
+        }
+###
+### 150518 ROL added new subnet
+###
+
+## CM 08-05-2017 81.31.215.192/26 is to replace 185.11.66.128/26 and 185.11.66.128/26 will be used on Knock Bridged to replace 31.186.34.0
+
+
+        subnet 81.31.215.192 netmask 255.255.255.192 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 81.31.215.193; ## On Slieveb7
+                option broadcast-address 81.31.215.255;
+                default-lease-time 90000; ### Lease time 1day+1hr.
+                max-lease-time 90000;
+                pool {
+                       range 81.31.215.200 81.31.215.254;
+                       deny known clients;
+                       allow unknown clients;
+                       #deny all clients;
+                }
+        }
+
+
+## CM 08-05-2017 185.11.66.128/26 replaced with 81.31.215.192/26 I need subnet below for Knock Bridged
+        subnet 185.11.66.128 netmask 255.255.255.192 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 185.11.66.129;
+                option broadcast-address 185.11.66.191;
+                default-lease-time 90000;
+                max-lease-time 90000;
+                #pool {
+                #        range 185.11.66.132 185.11.66.190;
+                #        allow unknown clients;
+                #        deny known clients;
+	#		#deny all clients;
+                #}
+        }
+
+        subnet 88.151.30.0 netmask 255.255.255.128 {
+                 option domain-name-servers 8.8.8.8, 8.8.4.4;
+                 option routers 88.151.30.1;
+                 option broadcast-address 88.151.30.127;
+                 default-lease-time 90000;
+                 max-lease-time 90000;
+                 pool {
+                        range 88.151.30.32 88.151.30.126;
+                        allow unknown clients;
+                        deny known clients;
+			#deny all clients;
+                }
+         }
+
+        subnet 185.11.65.64 netmask 255.255.255.192 {
+                option routers 185.11.65.65;
+                option broadcast-address 185.11.65.127;
+                option domain-name-servers 8.8.8.8, 212.113.0.3;
+                default-lease-time 90000;
+                max-lease-time 90000;
+                pool {
+                         range 185.11.65.70 185.11.65.126;
+                         allow unknown clients;
+                         deny known clients;
+			 #deny all clients;
+                }
+        }
+
+} ## End of shared-network Slieveboy-BSR7
+
+shared-network White-Casa4 {
+
+###       Forth Mountain Public DHCP Range            ###
+### 208.0  -> 208.3 is Reserved and ACL protected     ###
+### 208.4  -> 208.8 is Reserved for Testing           ###
+### No reserver addresses for static DHCP assignments ###
+
+
+subnet 172.21.68.0 netmask 255.255.254.0 {} ## GiAddr
+
+        subnet 37.128.193.128 netmask 255.255.255.128 {
+#                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option domain-name-servers 8.8.8.8, 212.113.0.3;
+                option routers 37.128.193.129;
+                option broadcast-address 37.128.193.255;
+                default-lease-time 90000;
+                max-lease-time 90000;
+		include "/etc/dhcp/WhiteCASA.classes";
+                pool {
+                        range 37.128.193.157 37.128.193.254;
+                        allow unknown clients;
+			deny known clients;
+                }
+        }
+
+        subnet 192.168.152.0 netmask 255.255.252.0 {
+#                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option domain-name-servers 8.8.8.8, 212.113.0.3;
+                option routers 192.168.152.1;
+                option broadcast-address 192.168.155.255;
+                default-lease-time 90000;
+                max-lease-time 90000;
+#               pool {
+#                        range 192.168.152.20 192.168.152.128;
+#                        allow unknown clients;
+#                        #deny all clients;
+#               }
+        }
+
+        subnet 81.31.208.0 netmask 255.255.255.0 {
+                option domain-name-servers 8.8.8.8, 212.113.0.3;
+                option routers 81.31.208.1;
+                option broadcast-address 81.31.208.255;
+                default-lease-time 90000;
+                max-lease-time 90000;
+                pool {
+                        range 81.31.208.9 81.31.208.254; ## ROL 15-11-16 reduced to free up space as CPEs moved to Wmtn5
+                        #range 81.31.208.9 81.31.209.192; ## CM 16-04-16 reduced from .250 to free up /26 for Slieveb7
+                        #range 81.31.208.9 81.31.208.254; ## CM 16-04-16 reduced to a /24 pool to free up 81.31.209.0/26
+                        allow unknown clients;
+			deny known clients;
+                }
+        }
+###
+### ROL 150513 added in new subnet.
+###
+        subnet 88.151.29.128 netmask 255.255.255.128 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 88.151.29.129;
+                option broadcast-address 88.151.29.255;
+                default-lease-time 90000;
+                max-lease-time 90000;
+                pool {
+                        range 88.151.29.133 88.151.29.254; 
+                        allow unknown clients;
+                        deny known clients;
+                }
+        }
+
+        ### White Static Public IP assignments 1 for MTA Modem Customers
+        subnet 88.151.26.192 netmask 255.255.255.224 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 88.151.26.193;
+                option broadcast-address 88.151.26.223;
+                default-lease-time 90000;
+                max-lease-time 90000;
+        }
+
+        ### White Static Public IP assignments 3 for MTA Modem Customers
+} ### End of shared-network White-Casa4
+
+shared-network White-Casa5 {
+
+subnet 172.21.37.0 netmask 255.255.255.0 {} ## GIAddr
+
+# ROL Temp Subnet for testing
+        subnet 172.22.66.0  netmask 255.255.254.0 {
+#                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option domain-name-servers 8.8.8.8, 212.113.0.3;
+                option routers 172.22.66.1;
+                option broadcast-address 172.22.67.254;
+                default-lease-time 90000;
+                max-lease-time 90000;
+              	#pool {
+                #       range 172.22.66.16 172.22.66.60;
+                #       allow unknown clients;
+                #}
+        }
+
+## CM New 88.151.29.0/26 subnet to replace 81.31.215.192/26
+#
+        subnet 88.151.29.0  netmask 255.255.255.192 {
+                option domain-name-servers 8.8.8.8, 212.113.0.3;
+                option routers 88.151.29.1;
+                option broadcast-address 88.151.29.63;
+                default-lease-time 90000;
+                max-lease-time 90000;
+                pool {
+                       range 88.151.29.3 88.151.29.62;  
+                       allow unknown clients;
+		       deny known clients;
+	#	       deny all clients;
+                }
+        }
+
+## CM 13-04-17 1139Hrs. This is to replace 185.11.64
+	subnet 81.31.212.64 netmask 255.255.255.224 {
+                option domain-name-servers 8.8.8.8, 212.113.0.3;
+                option routers 81.31.212.65; ## On CMTS
+                option broadcast-address 81.31.212.95;
+                default-lease-time 90000;
+                max-lease-time 90000;
+                pool {
+                        range 81.31.212.68 81.31.212.94;
+                        allow unknown clients;
+                        deny known clients;
+	#		deny all clients;
+                }
+        }
+
+## CM 14-04-17 1000hrs 31.186.34.0/24 being removed from pnet this subnet replaces it.
+#
+	subnet 185.11.64.0 netmask 255.255.255.128 {
+                option domain-name-servers 8.8.8.8, 212.113.0.3;
+                option routers 185.11.64.1; ## On CMTS
+                option broadcast-address 185.11.64.127;
+                default-lease-time 90000;
+                max-lease-time 90000;
+                pool {
+                        range 185.11.64.10 185.11.64.126; ## CM Room here for statics
+                        allow unknown clients;
+                        deny known clients;
+			#deny all clients;
+                }
+        }
+} ### End of shared-network White-Casa5
+
+shared-network White-Bridged {
+
+        subnet 192.168.158.0 netmask 255.255.254.0 {
+#                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option domain-name-servers 8.8.8.8, 212.113.0.3;
+                option routers 192.168.158.1;
+                option broadcast-address 192.168.159.255;
+                default-lease-time 90000;
+                max-lease-time 90000;
+                #pool {
+                #       range 192.168.158.20 192.168.158.40;
+                #       allow unknown clients;
+                #}
+        }
+
+        subnet 185.11.67.64 netmask 255.255.255.192 {
+                option domain-name-servers 8.8.8.8, 212.113.0.3;
+                option routers 185.11.67.65;
+                option broadcast-address 185.11.67.127;
+                default-lease-time 90000;
+                max-lease-time 90000;
+                pool {
+                        range 185.11.67.69 185.11.67.95; ## CM 150928 Was .236 Reduced by 32 addresses to free /27
+                        allow unknown clients;
+			deny known clients;
+         	 }
+        }
+
+        subnet 192.168.168.0 netmask 255.255.254.0 {
+#                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option domain-name-servers 8.8.8.8, 212.113.0.3;
+                option routers 192.168.168.1;
+                option broadcast-address 192.168.169.255;
+                default-lease-time 90000;
+                max-lease-time 90000;
+                ## CM 13-Sept-9 Had to activate a small private pool
+		#pool {
+                #        range 192.168.168.20 192.168.168.30;
+                #        allow unknown clients;
+                #}
+        }
+
+        subnet 37.128.193.0 netmask 255.255.255.128 {
+#                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option domain-name-servers 8.8.8.8, 212.113.0.3;
+                option routers 37.128.193.1;
+                option broadcast-address 37.128.193.127;
+                default-lease-time 90000;
+                max-lease-time 90000;
+		include "/etc/dhcp/WhiteManual_37.128.193.classes";
+                pool {
+                        range 37.128.193.6 37.128.193.126;
+                        allow unknown clients;
+			deny known clients;
+         	 }
+        }
+
+       subnet  88.151.27.192 netmask 255.255.255.240 {
+#                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option domain-name-servers 8.8.8.8, 212.113.0.3;
+                option routers 88.151.27.193;
+                option broadcast-address 88.151.27.207;
+                default-lease-time 90000;
+                max-lease-time 90000;
+                pool {
+                        range 88.151.27.197 88.151.27.206;
+                        allow unknown clients;
+			deny known clients;
+         	 }
+        }
+
+} # End of shared-network White-Bridged
+
+shared-network Crusline-Arris  {
+
+       subnet 192.168.249.0 netmask 255.255.255.0 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 192.168.249.1;
+                option broadcast-address 192.168.249.255;
+                default-lease-time 90000;
+                max-lease-time 90000;
+                #pool {
+                #        range 192.168.249.20 192.168.249.60;
+                #        allow unknown clients;
+                #}
+        }
+
+## CM 25-04-17 Reduced to 185.11.65.128/27 to free up bottom half for KnockBridged
+	subnet 185.11.65.128 netmask 255.255.255.192 {
+		option domain-name-servers 8.8.8.8, 8.8.4.4;
+		option domain-name-servers 8.8.8.8, 212.113.0.3;
+		option routers 185.11.65.129;
+		option broadcast-address 185.11.65.191;
+		default-lease-time 90000;
+		max-lease-time 90000;
+		include "/etc/dhcp/crushum.classes";
+		pool {
+			range 185.11.65.130 185.11.65.158;  ## CM 25-04-17 Freeing up 185.11.65.160/27
+			allow unknown clients;
+			deny known clients;
+			#deny all clients;
+		}
+	}
+
+
+## CM 25-04-17 new /28 so that I can proceed with IPAM project.
+
+	subnet 31.186.39.192 netmask 255.255.255.240 {
+		option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option domain-name-servers 8.8.8.8, 212.113.0.3;
+		option routers 31.186.39.193; ## CCR
+		option broadcast-address 31.186.39.207;
+		default-lease-time 90000;
+		max-lease-time 90000;
+		pool {
+			range 31.186.39.195 31.186.39.206;
+			allow unknown clients;
+			deny known clients;
+			#deny all clients;
+		}
+	}
+
+} #End of shared-network Crusline-Arris
+
+shared-network WexfordGAA {  ## CM omitted the hyphen so as not to get traps.
+       subnet 185.11.65.224  netmask 255.255.255.252 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option domain-name-servers 8.8.8.8, 212.113.0.3;
+                option routers 185.11.65.225;
+                option broadcast-address 185.11.65.230;
+                default-lease-time 90000;
+                max-lease-time 90000;
+                pool {
+                         range 185.11.65.226;
+                 }
+       }
+}
+
+#########################
+### LAB TEST IP RANGE ###
+#########################
+
+#shared-network LabTestRange {
+
+#        subnet 192.168.254.0 netmask 255.255.254.0 {
+#                option domain-name-servers 8.8.8.8, 8.8.4.4;
+#                option routers 192.168.254.1;
+#                option broadcast-address 192.168.255.255;
+#                default-lease-time 90000;
+#                max-lease-time 90000;
+#                pool {
+#                        range 192.168.254.20 192.168.254.40;
+#                        allow unknown clients;
+#                }
+#        }
+#
+#} #End of shared-network LabTestRange
+
+##############################
+### END OF PERMANET CONFIG ###
+##############################
+

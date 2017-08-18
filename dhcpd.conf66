@@ -1,0 +1,699 @@
+#################################
+## 		  KNOCK        ##
+#################################
+#
+#
+# DHCP Server Configuration file.
+#   see /usr/share/doc/dhcp*/dhcpd.conf.sample
+#   see 'man 5 dhcpd.conf'
+#
+# dhcpd.conf
+#
+# Sample configuration file for ISC dhcpd
+#
+##
+## Host Declarations and Class definitions for Static Hosts. These need to be moved to an include file
+##
+##
+## End of class definitions
+
+
+authoritative;
+
+## CM the following options are to enable cable source-verify dhcp authoritative to work properly. 
+## If these are missing multiple lease queries for CPE will occur and cpe won't have access.
+#
+option agent.circuit-id code 82 = string;
+stash-agent-options true;
+allow leasequery;
+#
+### END of  cable source-verify dhcp authoritative options
+#
+
+#include "/etc/dhcp/clare.hosts"; CM This is redundant.
+#include "/etc/dhcp/KnockManual_31.186.hosts"; CM these are now split into 2 classes file for each subnet.
+#include "/etc/dhcp/Knock_88.151.25.hosts";   CM There are now in file knock_88.151.25.classes.
+
+
+# Use this to send dhcp log messages to a different log file (you also
+# have to hack syslog.conf to complete the redirection).
+log-facility local7;
+
+# No service will be given on this subnet, but declaring it helps the 
+# DHCP server to understand the network topology.
+
+class "CableModem" {							### Why is this line here? JB 20120323
+match if substring(option vendor-class-identifier,0,6) = "docsis";	### Why is this line here? JB 20120323
+}									### Why is this line here? JB 20120323
+
+subnet 10.1.1.0 netmask 255.255.255.0 {
+}
+subnet 172.31.1.0 netmask 255.255.255.0 {}
+
+#######################################################
+###              New DHCP Configuration             ###
+### This Server is Primary for the Knockanore site. ###
+#######################################################
+
+## EF These are blocked clients from either k&k or from a point to point system:
+#
+host 19773 { hardware ethernet 0a:00:3e:f7:3e:8c; deny booting; }  
+host 19707 { hardware ethernet 0a:00:3e:f7:3e:8e; deny booting; }
+host 19792 { hardware ethernet 0a:00:3e:fc:0c:72; deny booting; } # EF Blocked as disconnected 150608
+host 19899 { hardware ethernet 0a:00:3e:d0:45:6f; deny booting; } # EF Blocked as disconnected 150608
+host 19659 { hardware ethernet 0a:00:3e:f7:2b:1d; deny booting; } # EF Blocked as disconnected 
+host 11051 { hardware ethernet 24:A4:3C:92:34:4F; deny booting; } # EF Blocked as disconnected 150608
+host 24745 { hardware ethernet 68:72:51:2c:85:41; deny booting; } # EF Blocked as disconnected 161003
+host 19350 { hardware ethernet 24:A4:3C:92:13:87; deny booting; } # EF Blocked as disconnected 170615
+#host 18451 { hardware ethernet 00:15:6D:FA:91:DE; deny booting; } # EF Blocked as holiday package 170811
+#
+
+
+#########################
+####                 #### 
+#### 	 BRIDGED     ####
+####                 ####
+#########################
+
+
+shared-network Knock-Bridged {
+
+###          Knockanore Public DHCP Range           ###
+###  32.0  ->  32.15 is Reserved and ACL protected  ###
+###  32.16 ->  32.20 is Reserved for Testing        ###
+###  32.21 ->  32.64 is for static DHCP assignments ###
+
+
+
+	## P2P
+	#
+	subnet 10.1.10.64 netmask 255.255.255.224 {
+		option domain-name-servers 8.8.8.8, 212.113.0.3;
+		option routers 10.1.10.65;
+		option broadcast-address 10.1.10.95;
+		default-lease-time 90000;
+		max-lease-time 90000;
+		include "/etc/dhcp/knock_10.1.10.classes";
+	}
+	
+	## DuaghRouter
+	subnet 192.168.144.0 netmask 255.255.255.0 { ### primary IP/GiAddr on Knock-Bridged CMTSs C1/0.1
+	include "/etc/dhcp/knock_DuaghRouter.classes";
+	}
+
+	## K&K CPE
+	subnet 84.203.223.0 netmask 255.255.255.0 {
+                option domain-name-servers 8.8.8.8, 212.113.0.3;
+                option routers 84.203.223.1;
+                option broadcast-address 84.203.223.255;
+                default-lease-time 90000;
+                max-lease-time 90000;
+                include "/etc/dhcp/knock_84.203.223.classes";
+        }
+
+	### GiAddr Range for Knock-Bridged and Emergency Range when Public IPs are exausted.
+#	subnet 192.168.144.0 netmask 255.255.248.0 {
+#                option domain-name-servers 8.8.8.8, 212.113.0.3;
+#                option routers 192.168.144.1;
+#                option broadcast-address 192.168.151.255;
+#                default-lease-time 900; ### Very Small Lease Time.
+#                max-lease-time 900;
+#                #pool {
+#                #        range 192.168.144.20 192.168.144.120;
+#                #        allow unknown clients;
+#                #}
+#
+#	}
+
+
+## CM 08-05-17 CM needed to put back 88.151.27.0/26 because ID18732 are unable to change IP address, they are a windfarm.
+	subnet 88.151.27.0 netmask 255.255.255.192 {
+        	option domain-name-servers 8.8.8.8, 8.8.4.4;
+	        option routers 88.151.27.1;  ## On CCR1
+        	option broadcast-address 88.151.27.63;
+	        default-lease-time 90000; 
+        	max-lease-time 90000;
+		include "/etc/dhcp/knock_88.151.27.classes";
+   	}
+
+
+## CM 27-04-17 This subnet is to replace 31.186.37.0/24
+	subnet 31.186.37.0 netmask 255.255.255.0 {
+        	option domain-name-servers 8.8.8.8, 8.8.4.4;
+	        option routers 31.186.37.1;
+        	option broadcast-address 31.186.37.255;
+	        default-lease-time 90000; 
+        	max-lease-time 90000;
+		pool {
+	        	range 31.186.37.11 31.186.37.254;     ## CM  10-04-16 Reduced pool to /24 range
+		        allow unknown clients;
+	        	deny known clients;			
+	        	#deny all clients;		
+        	}
+   	}
+###
+## CM 25-04-17 First /27 to replace 31.186.34.0/25, CMTS configured.
+
+        subnet 185.11.65.160 netmask 255.255.255.224 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 185.11.65.161; ## CCR1
+                option broadcast-address 185.11.65.191;
+                default-lease-time 90000; ### Lease time 1day+1hr.
+                max-lease-time 90000;
+                pool {
+                        range 185.11.65.168 185.11.65.190;  ## CM Don't forget first few IPs are needed for Bridged CMTSs!
+                        deny known clients;
+                        allow unknown clients;
+			#deny all clients;
+                }
+        }
+
+## CM 25-04-17 Second /27 to replace 31.186.34.0/25, CMTS configured.
+
+        subnet 81.31.212.96 netmask 255.255.255.224 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 81.31.212.97; ## CCR1
+                option broadcast-address 81.31.212.127;
+                default-lease-time 90000; ### Lease time 1day+1hr.
+                max-lease-time 90000;
+                pool {
+                        range 81.31.212.103 81.31.212.126;  ## CM Don't forget first few IPs are needed for Bridged CMTSs!
+                        deny known clients;
+                        allow unknown clients;
+			#deny all clients;
+                }
+        }
+
+## CM 25-04-17 Third /27 to replace 31.186.34.0/25, CMTS configured.
+
+        subnet 37.128.196.224 netmask 255.255.255.224 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 37.128.196.225; ## CCR1
+                option broadcast-address 37.128.196.255;
+                default-lease-time 90000; ### Lease time 1day+1hr.
+                max-lease-time 90000;
+                pool {
+                        range 37.128.196.231 37.128.196.255;  ## CM Don't forget first few IPs are needed for Bridged CMTSs!
+                        deny known clients;
+                        allow unknown clients;
+			#deny all clients;
+                }
+        }
+
+## CM 25-04-17 Forth /27 to replace 31.186.34.0/25, CMTS configured.
+
+        subnet 88.151.26.0 netmask 255.255.255.224 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 88.151.26.1; ## CCR1
+                option broadcast-address 88.151.26.32;
+                default-lease-time 90000; ### Lease time 1day+1hr.
+                max-lease-time 90000;
+                pool {
+                        range 88.151.26.7 88.151.26.31;  ## CM Don't forget first few IPs are needed for Bridged CMTSs!
+                        deny known clients;
+                        allow unknown clients;
+			#deny all clients;
+                }
+        }
+
+## CM 09-05-2017 185.11.66.128/26 to replace 31.186.34.0. 
+        subnet 185.11.66.128 netmask 255.255.255.192 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 185.11.66.129;   ## CM Don't forget first few IPs are needed for Bridged CMTSs!
+                option broadcast-address 185.11.66.191;
+                default-lease-time 90000;
+                max-lease-time 90000;
+                pool {
+                        range 185.11.66.137 185.11.66.190;
+                        allow unknown clients;
+                        deny known clients;
+                        #deny all clients;
+                }
+        }
+
+## CM 09-05-2017 Replacing with 185.11.66.128/26
+## CM 08-05-2017 Still looking for /26 replace below.
+## CM 26-04-17 1417Hrs This subnet is being removed from pnet.
+
+
+	subnet 31.186.34.0 netmask 255.255.255.128 {
+        	option domain-name-servers 8.8.8.8, 8.8.4.4;
+	        option routers 31.186.34.1;
+        	option broadcast-address 31.186.34.127;
+	        default-lease-time 90000; ### Lease time 1day+1hr.
+        	max-lease-time 90000;
+		#pool {
+	        #	range 31.186.34.10 31.186.34.63;	### CM 27-04-17 Pools exhausted had to release a /26 have to find a /26 to backfill this
+	        #	#range 31.186.34.10 31.186.34.126;	### ### ROL 161012 reclaiming top /25
+	        #	deny known clients;
+		#	allow unknown clients;
+		#	#deny all clients;
+        	#}
+   	}
+
+}   #### end of shared-network Knock-Bridged
+
+
+#########################
+####                 #### 
+#### 	 TKNOCK      ####
+####                 ####
+#########################
+
+shared-network Tknock1-Bundle2 {
+###     giaddr subnet for hosts. Also for temporary use for Bundle Transition.
+
+        subnet 172.26.2.0 netmask 255.255.254.0 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 172.26.2.1; #On CMTS
+                option broadcast-address 172.26.3.255;
+                #default-lease-time 90000;
+                #max-lease-time 90000;
+                default-lease-time 90000;
+                max-lease-time 90000;
+                #pool {
+                #       range 172.26.2.210 172.26.3.50;
+                #       deny all clients;
+                #       allow unknown clients;
+                #}
+        }
+
+	subnet 10.1.15.0 netmask 255.255.255.252 { ## CM 21-12-15 This is for Duagh AP
+		option domain-name-servers 8.8.8.8, 8.8.4.4;
+		option routers 10.1.15.1; ## CM On K11 Bundle 2
+		option broadcast-address 10.1.15.3;
+		default-lease-time 90000;
+		max-lease-time 90000;		
+		include "/etc/dhcp/Duagh_AP.classes";
+
+		}
+
+        subnet 31.186.38.0 netmask 255.255.255.0 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 31.186.38.1;
+                option broadcast-address 31.186.38.255;
+                default-lease-time 90000;
+                max-lease-time 90000;
+                #default-lease-time 90000;
+                #max-lease-time 90000;
+		include "/etc/dhcp/knockSE_31.186.38.classes";
+                pool {
+                        range 31.186.38.30 31.186.38.254;  ## .16 to .29 reserved for STATIC 
+                        allow unknown clients;
+			deny known clients;
+			#deny all clients; ## Testing
+                }
+        }
+        
+	subnet 31.186.39.0 netmask 255.255.255.192 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 31.186.39.1;
+                option broadcast-address 31.186.39.63;
+                default-lease-time 90000;
+                max-lease-time 90000;
+                #default-lease-time 90000;
+                #max-lease-time 90000;
+                include "/etc/dhcp/31.186.39.0.classes";
+                pool {
+                        range 31.186.39.4 31.186.39.63;  ##ROL 151215 reducing pool. ## CM 25-04-17 31.186.39.3 is static for ID8926
+			#deny all clients; ## Testing
+                        deny known clients;
+			allow unknown clients;
+                }
+        }
+
+}  ### end of shared-network tknock1 bundle 2
+
+shared-network Tknock-Bridged {
+	        subnet 172.21.99.0 netmask 255.255.255.0 {} ## GiAddr Subnet
+
+## CM 13-04-16 Temp Subnet as not certain which Pub ranges are usable
+#
+
+	subnet 172.22.99.0 netmask 255.255.255.0 {
+		option domain-name-servers 8.8.8.8, 8.8.4.4;
+		option routers 172.22.99.1; ## On Wan2 Unit 21
+		option broadcast-address 172.22.99.255;
+		default-lease-time 90000;
+		max-lease-time 90000;
+		#pool {
+	        #	range 172.22.99.10 172.22.99.30; ## 99.3 Tknock3, 99.4 Tknock4
+		#	allow unknown clients;
+			#deny all clients;	
+		#}
+	}
+
+
+## CM 19-04-16 new subnet 37.128.199.96/27
+#
+        subnet 37.128.199.96 netmask 255.255.255.224 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 37.128.199.97; ## WAN2 unit 32
+                option broadcast-address 37.128.199.127;
+                default-lease-time 90000;
+                max-lease-time 90000;
+                pool {
+                        range 37.128.199.100 37.128.199.126; ## 98 and 99 for CMTS
+                        allow unknown clients;
+                        deny known clients;
+                        #deny all clients;
+                }
+        }
+
+	subnet 88.151.26.224 netmask 255.255.255.224 {
+		option domain-name-servers 8.8.8.8, 8.8.4.4;
+		option routers 88.151.26.225; ## On Wan2 Unit 21
+		option broadcast-address 88.151.26.255;
+		default-lease-time 90000;
+		max-lease-time 90000;
+#		default-lease-time 90000;
+#		max-lease-time 90000;
+		pool {
+			range 88.151.26.227 88.151.26.254; 
+			allow unknown clients;
+			deny known clients;
+			#deny all clients;
+		}
+	}
+
+	subnet 81.31.213.192 netmask 255.255.255.192 {  ## CM 150928 Freed from KnockBridged
+		option domain-name-servers 8.8.8.8, 8.8.4.4;
+		option routers 81.31.213.193; ## On Wan2 Unit 32
+		option broadcast-address 81.31.213.255;
+		default-lease-time 90000;
+		max-lease-time 90000;
+#		default-lease-time 90000;
+#		max-lease-time 90000;
+		pool {
+			range 81.31.213.200 81.31.213.254; 
+			allow unknown clients;
+			deny known clients;
+			#deny all clients;
+		}
+	}
+
+
+	subnet 81.31.209.160 netmask 255.255.255.224 {  
+		option domain-name-servers 8.8.8.8, 8.8.4.4;
+		option routers 81.31.209.161; ## On CCR1 vlan 32
+		option broadcast-address 81.31.209.192;
+		default-lease-time 90000;
+		max-lease-time 90000;
+		pool {
+			range 81.31.209.165 81.31.209.191; ## Need IPs for Arris CMTS 
+			allow unknown clients;
+			deny known clients;
+			#deny all clients;
+		}
+	}
+} ## End shared-network Tknock-Bridged
+
+shared-network Tknock1-Bundle1 {
+	        subnet 172.21.100.0 netmask 255.255.255.0 {} ## GiAddr Subnet
+
+## CM 11-04-16 Temp Private Subnet
+
+        subnet 172.22.60.0 netmask 255.255.255.0 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 172.22.60.1;  ## On Tknock1 Bundle 1
+                option broadcast-address 172.22.60.255;
+                default-lease-time 90000;
+                max-lease-time 90000;
+                #pool {
+		#	range 172.22.60.10 172.22.60.15;
+                #        allow unknown clients;
+                        #deny all clients; ## Testing
+                #	}
+	}
+
+
+## CM 12-04-17 1619HRS new /27 may not be needed, check on 13/04
+
+                subnet 88.151.29.64 netmask 255.255.255.224 {
+                        option domain-name-servers 8.8.8.8, 8.8.4.4;
+                        option routers 88.151.29.65;  ## On Tknock1 Bundle 1
+                        option broadcast-address 88.151.29.95;
+                        default-lease-time 90000;
+                        max-lease-time 90000;
+                        pool {
+                               range 88.151.29.66 88.151.29.94;
+                               allow unknown clients;
+                               #deny all clients;
+                        }
+        }
+	         subnet 88.151.30.128 netmask 255.255.255.224 {
+                 option domain-name-servers 8.8.8.8, 8.8.4.4;
+                 option routers 88.151.30.129;
+                 option broadcast-address 88.151.30.159;
+                 default-lease-time 90000;
+                 max-lease-time 90000;
+                 pool {
+                        range 88.151.30.131 88.151.30.158;
+                        allow unknown clients;
+                        deny known clients;
+                        #deny all clients;
+                }
+        }
+
+## CM 12-04-17 New 31.186.39.128/26 to replace 185.11.66.x subnets
+#
+                 subnet 31.186.39.128 netmask 255.255.255.192 {
+                 option domain-name-servers 8.8.8.8, 8.8.4.4;
+                 option routers 31.186.39.129;
+                 option broadcast-address 31.186.39.191;
+                 default-lease-time 90000;
+                 max-lease-time 90000;
+                 pool {
+                        range 31.186.39.132  31.186.39.190;
+                        allow unknown clients;
+                        deny known clients;
+			#deny all clients;
+		}
+	}
+
+	 ## CM 150110 This range used to be ForthCasa
+	 subnet 185.11.65.0 netmask 255.255.255.224 {
+               option domain-name-servers 8.8.8.8, 8.8.4.4;
+               option domain-name-servers 8.8.8.8, 212.113.0.3;
+               option routers 185.11.65.1;  ## On Tknock1 Casa
+               option broadcast-address 185.11.65.31;
+#                default-lease-time 90000;
+#                max-lease-time 90000;
+               default-lease-time 90000;
+               max-lease-time 90000;
+               pool {
+                       range 185.11.65.3 185.11.65.30;
+                       allow unknown clients;
+                       deny known clients;   ## So that someone from a 'classes Static IP' won't get IP from this pool
+                       #deny all clients; ## 
+               }
+       }
+
+        subnet 81.31.213.160 netmask 255.255.255.224 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 81.31.213.161;	### on Tknock1-bundle1
+                option broadcast-address 81.31.213.191;
+#                default-lease-time 90000;
+#                max-lease-time 90000;
+                default-lease-time 90000;
+                max-lease-time 90000;
+                pool {
+                        range 81.31.213.162 81.31.213.190;
+                        allow unknown clients;
+                        deny known clients;
+                        #deny all clients;
+                }
+        }
+## ROL 10-08-17 New 31.186.35.192/26 to migrate Glow modems.
+## set to deny all for now, until its needed
+#
+                 subnet 31.186.35.192 netmask 255.255.255.192 {
+                 option domain-name-servers 8.8.8.8, 8.8.4.4;
+                 option routers 31.186.35.193;
+                 option broadcast-address 31.186.35.255;
+                 default-lease-time 90000;
+                 max-lease-time 90000;
+                 pool {
+                        range 31.186.35.196  31.186.35.254;
+                        allow unknown clients;
+                        deny known clients;
+			deny all clients;
+		}
+	}
+
+
+} ## End shared-network Tknock1-Bundle1
+
+
+
+
+#########################
+####                 #### 
+#### 	 ROUTED      ####
+####                 ####
+#########################
+###  Knock13 BSR
+#Bundle 1
+
+shared-network K13-Bundle1 {
+###     giaddr subnet for hosts.
+        subnet 172.22.50.0 netmask 255.255.255.0 { }
+
+        subnet 31.186.36.0 netmask 255.255.255.0 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 31.186.36.1;
+                option broadcast-address 31.186.36.255;
+                default-lease-time 90000;
+                max-lease-time 90000;
+                include "/etc/dhcp/knockSW_31.186.36.classes";
+                pool {
+#                       range 31.186.36.50 31.186.37.254;  ## .18 to .49 reserved for STATIC
+###
+### 150512 ROL - NB top /26 of this subnet 31.186.37.192-254 now allocated to MtGab on 10.1.1.75
+### Don't increase pool beyond 31.186.37.191 !!!
+### 150528 ROL - freeing up addresses 31.186.37.160/27 (160-191)
+###   only static addresses in use are 31.186.37.5-7 so 7-15 currently available for static.
+### Don't increase pool beyond 31.186.37.159 !!!
+###
+                        range 31.186.36.16 31.186.36.254;  ## CM 10-04-17 reduced to /24 range
+                        #range 31.186.36.16 31.186.37.110;  ## CM 03-05-16 extented to 110 as pools exhausted
+                        #deny all clients;
+                        deny known clients;
+                        allow unknown clients;
+                }
+        }
+
+        #CM 130917 New public subnet, was part of white but was freed up
+        subnet  88.151.25.192 netmask 255.255.255.224 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 88.151.25.193;
+                option broadcast-address 88.151.25.223;
+                default-lease-time 90000;
+                max-lease-time 90000;
+                pool {
+                        range 88.151.25.194 88.151.25.222;
+                        deny known clients;
+                        allow unknown clients;
+                        #deny all clients;
+                }
+        }
+
+        subnet  88.151.30.176 netmask 255.255.255.240 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 88.151.30.177;
+                option broadcast-address 88.151.30.191;
+                default-lease-time 90000;
+                max-lease-time 90000;
+                pool {
+                        range 88.151.30.178 88.151.30.190;
+                        deny known clients;
+                        allow unknown clients;
+                        #deny all clients;
+               }
+        }
+}  ### End shared-network K13_Bundle 1
+
+#Bundle 3
+shared-network K13-Bundle3 {
+###     giaddr subnet for hosts.
+        subnet 172.22.52.0 netmask 255.255.255.0 { }
+
+        subnet 172.22.64.0 netmask 255.255.255.0 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 172.22.64.1;  ## On Knock13
+                option broadcast-address 172.22.64.255;
+                default-lease-time 90000;
+                max-lease-time 90000;
+                #pool {
+                #        range 172.22.64.10 172.22.64.20; ### CM 30-04-16 enabled 10 IPs as temp measure.
+                #        allow unknown clients;
+                #        #deny all clients; ## Testing
+                #}
+        }
+## 31.186.39.80/28 available                                
+
+##CM 19-04-16 new subnet 88.151.27.96/27  to replace private 
+        subnet 88.151.27.96 netmask 255.255.255.224 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 88.151.27.97;  ## On Knock13
+                option broadcast-address 88.151.27.127;
+                default-lease-time 90000;
+                max-lease-time 90000;
+                pool {
+                        range 88.151.27.98 88.151.27.126;
+                        allow unknown clients;
+                        #deny all clients; ## Testing
+                }
+        }
+
+
+## CM 170407 New 81.31.215.0/24 to replaced the /28s
+
+	subnet 81.31.215.0 netmask 255.255.255.0 {
+		option domain-name-servers 8.8.8.8, 8.8.4.4;
+		option routers 81.31.215.1; ## On Knock11 Bundle 3
+		option broadcast-address 81.31.215.255;
+		default-lease-time 90000;
+		max-lease-time 90000;
+		pool {
+			range 81.31.215.10 81.31.215.190; ## CM 03-05-17 1200Hrs want to free up 81.31.215.192/26 reducing to /25 was too tight
+			#range 81.31.215.10 81.31.215.251; ## 81.31.215.252/30 is for MolloyMetals Infinet Slieveboy
+			allow unknown clients;
+			deny known clients;
+			#deny all clients;
+		}
+	}
+
+	## CM 160613 New Subnet
+	
+        subnet 37.128.195.192 netmask 255.255.255.240 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 37.128.195.193;  ## On Knock113 Bundle 3
+                option broadcast-address 37.128.195.207;
+                default-lease-time 90000;
+                max-lease-time 90000;
+                default-lease-time 90000;
+                max-lease-time 90000;
+		include "/etc/dhcp/37.128.195.classes";
+                pool {
+                	range   37.128.195.196 37.128.195.206;
+                	allow unknown clients;
+               		#deny all clients; ## Testing
+                }
+	}
+}  ### End shared-network K13_Bundle 3
+
+#Bundle 4
+shared-network K13-Bundle4 {
+###     giaddr subnet for hosts.
+        subnet 172.22.54.0 netmask 255.255.255.0 { }
+
+        subnet 172.22.65.0 netmask 255.255.255.0 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 172.22.65.1;  ## On Knock13
+                option broadcast-address 172.22.65.255;
+                default-lease-time 90000;
+                max-lease-time 90000;
+#                pool {
+#                        range 172.22.65.10 172.22.65.254;
+##                        allow unknown clients;
+#                        deny all clients;
+#                }
+        }
+        subnet 37.128.197.0 netmask 255.255.255.128 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 37.128.197.1;
+                option broadcast-address 37.128.197.128;
+                default-lease-time 90000;
+                max-lease-time 90000;
+                #default-lease-time 90000;
+                #max-lease-time 90000;
+                pool {
+                        range 37.128.197.16 37.128.197.127;	### ROL 160630 .8 to .15 reserved for static.
+                        allow unknown clients;
+                        #deny all clients; ## Testing
+                }
+        }
+
+}  ### End shared-network K13_Bundle 4
+

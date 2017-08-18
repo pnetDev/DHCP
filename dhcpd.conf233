@@ -1,0 +1,791 @@
+# CM 150518 This is a modified version of ISC DHCP 4.2.5. The lease query paramaters are changed to be compatable with cisco.
+# Instead of LEASEACTIVE and LEASEUNKNOWN etc you will see DHCPACK and DHCPNACK in messages log.
+#
+# DHCP Server Configuration file.
+#   see /usr/share/doc/dhcp*/dhcpd.conf.sample
+#   see 'man 5 dhcpd.conf'
+#
+# dhcpd.conf
+#
+# Sample configuration file for ISC dhcpd
+#
+
+# option definitions common to all supported networks...
+#option domain-name "example.org";
+#option domain-name-servers ns1.example.org, ns2.example.org;
+
+# Use this to enble / disable dynamic dns updates globally.
+#ddns-update-style none;
+#ddns-update-style ad-hoc;
+ddns-update-style interim;
+# If this DHCP server is the official DHCP server for the local
+# network, the authoritative directive should be uncommented.
+
+
+# Use this to send dhcp log messages to a different log file (you also
+# have to hack syslog.conf to complete the redirection).
+
+## CM the following options are to enable cable source-verify dhcp authoritative to work on Arris CMTS
+
+option agent.circuit-id code 82 = string;
+stash-agent-options true;
+authoritative;
+allow leasequery;
+
+## END of  cable source-verify dhcp authoritative options
+
+log-facility local7;
+## Ping IP before making an offer
+# ping-check true;
+
+# No service will be given on this subnet, but declaring it helps the
+# DHCP server to understand the network topology.
+
+subnet 10.1.1.0 netmask 255.255.255.0 {
+}
+
+## CM This is the AWS subnet
+subnet 172.31.1.0 netmask 255.255.255.0 {}
+
+#################################################
+###           New DHCP Configuration          ###
+### This Server is Primary for uBR sites.     ###
+###                                           ###
+#################################################
+
+# CM These declarations are not needed but leaving them there.
+
+#Hitron Spec
+option space docsis-mta;
+option docsis-mta.dhcp-server-1 code 1 = ip-address;
+option docsis-mta.dhcp-server-2 code 2 = ip-address;
+#option docsis-mta.provision-server code 3 = string ;
+option docsis-mta.provision-server code 3 = { integer 8, ip-address };
+option docsis-mta.krb-realm-name code 6 = string;
+option docsis-mta-pkt code 122 = encapsulate docsis-mta;
+
+class "MTA" {
+match if substring(option vendor-class-identifier,0,5) = "pktc1";
+default-lease-time 90000;
+#max-lease-time 21600;
+#min-lease-time 10800;
+#option time-offset -10800;
+#ArrisMTA seems to require the following 2 options although they are unused - prob not time-server
+option domain-name "permanet.ie";
+option log-servers 10.1.1.233;
+option time-servers 10.1.1.233;
+#Arris and Hitron MTA seems to use the next-server IP here rather than the IP from DNS lookup ?
+next-server 10.1.1.79;
+ddns-updates off;
+option docsis-mta.krb-realm-name 05:42:41:53:49:43:01:31:00;
+# this says provmta.permalab.ie and BASIC.1
+option docsis-mta.provision-server 1 10.1.1.79;
+}
+
+#
+# List hitron MTAs here
+#
+# include automatically generated files here
+#
+#include "/etc/dhcp/dhcpScriptAdditions";
+
+# Include a subnet/pool here for each node for MTAs, pool must not overlap other CPE pools
+# Need to include a route through the firewall for TFTP from the MTA to 10.1.1.79
+
+## CM 150309 These are clients connected to Broadford AP. One client is causing an issue so DHCP blocked for the following MACS:
+#
+# host Client1 { hardware ethernet 00:0c:42:64:8d:66; deny booting; }  This is the Microtec AP.
+#host Client2 { hardware ethernet 00:27:22:3e:98:61; deny booting; } # EF Blocked disco id 18568
+## Clients that eddy blocked
+#host Client3 { hardware ethernet 68:72:51:2c:5c:40; deny booting; }
+#host Client4 { hardware ethernet 00:27:22:e8:1c:59; deny booting; }
+#host Client5 { hardware ethernet 00:0c:42:31:62:c4; deny booting; } ## Microtik Client Mulchrone
+#host Client6 { hardware ethernet 00:15:6d:b0:30:54; deny booting; }
+#host Client20 { hardware ethernet 68:72:51:3A:BA:1A;deny booting; }
+## End of clients eddie blocked
+
+#host Client7 { hardware ethernet 00:0c:42:78:c3:77; deny booting; }
+#host Client8 { hardware ethernet dc:9f:db:e4:88:1f; deny booting; }
+#host Client9 { hardware ethernet 00:15:6d:b0:31:bb; deny booting; }
+#host Client10 { hardware ethernet 00:15:6d:b0:30:0d; deny booting; }
+#host Client11 { hardware ethernet 00:15:6d:b0:30:57; deny booting; }
+host Client12 { hardware ethernet dc:9f:db:92:5b:5a; deny booting; } # EF Blocked disco id 22822
+#host Client13 { hardware ethernet dc:9f:db:92:5c:c6; deny booting; }
+#host Client15 { hardware ethernet 00:27:22:78:98:f1; deny booting; }
+host Client16 { hardware ethernet 00:11:7c:0a:2a:28; deny booting; } # EF Blocked disco id 7406
+#host Client17 { hardware ethernet 00:0c:42:2b:dc:0a; deny booting; } # EF Blocked holiday packge id 11921
+host Client18 { hardware ethernet 00:0c:42:23:e1:cf; deny booting; } # # EF Blocked 1362
+host Client19 { hardware ethernet dc:9f:db:e4:88:1f; deny booting; } # #  EF Blocked 12035
+#host Client20 { hardware ethernet dc:9f:db:92:5a:52; deny booting; } # #  EF Blocked 12047
+### CHEEKPOINT ###
+
+shared-network Cheekp-uBR {
+## CM 150519 GiAddr for Cheekp2 is now MTA subnet so needs to be delared below
+subnet 172.20.76.0 netmask 255.255.255.0 {}
+
+## CM 11-04-17 This subnet used for static IPs and are natted on LAN1.	
+        subnet 192.168.240.0 netmask 255.255.255.0 {
+#               option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option domain-name-servers 8.8.8.8, 212.113.0.3;
+                option routers 192.168.240.1;  ### On Cheekp-uBR
+                option broadcast-address 192.168.240.255;
+                default-lease-time 90000;
+                max-lease-time 90000;
+		include "/etc/dhcp/Cheekp.static.classes";
+
+        }
+
+## CM 10-04-17 /29 for Statics
+## CM 25-04-17 Change of plan. Using first few addresses of 88.151.25.0/25 instead.
+#	subnet 88.151.26.0 netmask 255.255.255.248 {
+#		option domain-name-servers 8.8.8.8, 212.113.0.3;
+#		option routers 88.151.26.1; ## On cheekp uBR
+#		option broadcast-address 88.151.26.7;
+#		default-lease-time 90000;
+#		max-lease-time 90000;
+#		include "/etc/dhcp/Cheekp.classes";
+#	}
+
+## CM 10-04-17 new /25 to replace 31.186.35.0/24
+	subnet 88.151.25.0 netmask 255.255.255.128 {
+		option domain-name-servers 8.8.8.8, 212.113.0.3;
+		option routers 88.151.25.1; ## On cheekp uBR
+		option broadcast-address 88.151.25.127;
+		default-lease-time 90000;
+		max-lease-time 90000;
+		include "/etc/dhcp/Cheekp.classes";
+		pool {
+			range 88.151.25.6 88.151.25.126; ## CM .2 to .5 for static.
+			allow all clients;
+			deny known clients;
+		}
+	}
+
+        subnet 185.11.67.0 netmask 255.255.255.192 {
+                option domain-name-servers 8.8.8.8, 212.113.0.3;
+                option routers 185.11.67.1;
+                option broadcast-address 185.11.67.63;
+                default-lease-time 90000;
+                max-lease-time 90000;
+                pool {
+                        range 185.11.67.4 185.11.67.62;
+                        allow unknown clients;
+                        deny known clients;
+                }
+        }
+
+###
+### 150519 ROL new public subnet added
+###
+        subnet 88.151.26.64 netmask 255.255.255.224 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 88.151.26.65;
+                option broadcast-address 88.151.26.95;
+                default-lease-time 90000;
+                max-lease-time 90000;
+                pool {
+                        range 88.151.26.68 88.151.26.94; 
+                        allow unknown clients;
+                        deny known clients;
+                }
+        }
+
+} ## End Shared-network Cheekp-uBR
+
+### COOLG ###
+
+shared-network CoolG-uBR {
+subnet 172.20.40.0 netmask 255.255.252.0 {} ## Coolg3 GiAddr
+
+        subnet 192.168.202.0 netmask 255.255.254.0 {
+#                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option domain-name-servers 8.8.8.8, 212.113.0.3;
+                option routers 192.168.202.1;
+                option broadcast-address 192.168.203.255;
+                default-lease-time 90000;
+                max-lease-time 90000;
+                ##CM 8-jul-14 Had to add this private pool
+###
+### 150519 ROL private pool removed
+###
+#                pool {
+#                       range 192.168.202.20 192.168.202.50;  #CM 11.03.15 Extended pool by 10 addresses
+#                       allow unknown clients;
+#                       deny known clients;
+#               }
+        }
+
+	subnet 88.151.27.64 netmask 255.255.255.224 {
+		option domain-name-servers 8.8.8.8, 212.113.0.3;
+		option routers 88.151.27.65;
+		option broadcast-address 88.151.27.95;
+		default-lease-time 90000;
+		max-lease-time 90000;
+		pool {
+			range 88.151.27.67 88.151.27.94;
+			deny known clients;
+			allow unknown clients;
+			#deny all clients;
+		}
+	}
+
+
+        subnet 81.31.210.0 netmask 255.255.255.0 {
+                option domain-name-servers 8.8.8.8, 212.113.0.3;
+                option routers 81.31.210.1;
+                option broadcast-address 81.31.210.255;
+                default-lease-time 90000;
+                max-lease-time 90000;
+		include "/etc/dhcp/coolg_81.31.210.classes";
+### ROL 150825 reserving the first ~16 addresses (.4 to .19) for static.
+                pool {
+                        #range 81.31.210.20 81.31.210.254;
+                        range 81.31.210.20 81.31.210.191; ## CM 161004 reduced pool to 81.31.210.191 to free up 81.31.210.192/26 for MISH10K
+                        allow unknown clients;
+                        deny known clients;
+                }
+        }
+###
+### 150526 ROL reduced subnet from /26 to /27
+###
+        ### CoolG Static Public IP assignments
+        subnet 88.151.26.0 netmask 255.255.255.224 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 88.151.26.2;
+                option broadcast-address 88.151.26.31;
+                default-lease-time 90000;
+                max-lease-time 90000;
+                include "/etc/dhcp/coolg.classes";
+        }
+} #End of shared-network CoolG-uBR
+
+
+### MTGAB ###
+
+shared-network MtGab-uBR {
+
+## CM 150515 New GiAddr is MTA subnet 172.20.64.1 so declaring this below without a pool
+subnet 172.20.64.0 netmask 255.255.252.0 {}
+
+        ## Subnet for P2P that don't have DHCP option
+        subnet 10.1.11.0 netmask 255.255.255.0 {
+                 option domain-name-servers 8.8.8.8, 212.113.0.3;
+                option routers 10.1.11.1;
+                option broadcast-address 10.1.11.255;
+                default-lease-time 90000;
+                max-lease-time 90000;
+                include "/etc/dhcp/MtGab_10.1.11.classes";
+        }
+
+#        subnet 192.168.166.0 netmask 255.255.254.0 {
+#                option domain-name-servers 8.8.8.8, 8.8.4.4;
+#                option domain-name-servers 8.8.8.8, 212.113.0.3;
+#                option routers 192.168.166.1;
+#                option broadcast-address 192.168.167.255;
+#                default-lease-time 90000;
+#                max-lease-time 90000;
+
+#### CM 24-08-13 had to add small private pool. Need to add /28 public pool.
+#                       pool {
+#       ####Cm 4th Aug 2014 Increased this pool. 4 were left.
+#                       range 192.168.166.20 192.168.166.100;
+#                       allow unknown clients;
+#                       deny known clients;
+#                }
+#        }
+
+        subnet 81.31.214.0 netmask 255.255.255.0 {
+                option domain-name-servers 8.8.8.8, 212.113.0.3;
+                option routers 81.31.214.1;
+                option broadcast-address 81.31.214.255;
+                default-lease-time 90000; ## 
+                max-lease-time 90000;
+                include "/etc/dhcp/MtGabManual.classes";
+                pool {
+#                        range 81.31.214.11 81.31.214.254;  # CM .5 to .9 are static
+                        range 81.31.214.11 81.31.214.190;  # ROL 160229 reducing subnet to free up space
+                        allow unknown clients;
+                        deny known clients;
+#			#deny all clients;
+                }
+        }
+
+        ### CM 130719 New Public IP DHCP Range
+        subnet 88.151.24.96 netmask 255.255.255.224 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 88.151.24.97;
+                option broadcast-address 88.151.24.127;
+                default-lease-time 90000; 
+                max-lease-time 90000;
+                pool {
+                        range 88.151.24.100 88.151.24.126;
+                        allow unknown clients;
+                        deny known clients;
+#			#deny all clients;
+                }
+        }
+	
+
+
+## CM 14-07-17 New range to replace 31.186.33.0 
+        subnet 185.11.64.128 netmask 255.255.255.192 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 185.11.64.129;  ## On uBR
+                option broadcast-address 185.11.64.191;
+                default-lease-time 90000; 
+                max-lease-time 90000;
+                pool {
+                        range 185.11.64.132 185.11.64.190;
+                        allow unknown clients;
+                        deny known clients;
+                        deny known clients;
+#			#deny all clients;
+                }
+        }
+
+        ### ROL 09-08-17 New Public IP DHCP Range
+        subnet 88.151.29.112 netmask 255.255.255.240 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 88.151.29.113;
+                option broadcast-address 88.151.29.127;
+                default-lease-time 90000; 
+                max-lease-time 90000;
+                pool {
+                        range 88.151.29.114 88.151.29.126;
+                        allow unknown clients;
+                        deny known clients;
+#			#deny all clients;
+                }
+        }
+	
+
+## CM 14-07-17 Being removed from network
+	subnet 31.186.33.0 netmask 255.255.255.0 {
+		option domain-name-servers 8.8.8.8, 8.8.4.4;
+		option routers 31.186.33.1; ## On the uBR
+	        option broadcast-address 31.186.33.255;
+		default-lease-time 90000;
+		max-lease-time 90000;
+		#pool {
+		#	range 31.186.33.4 31.186.33.62;
+		#	allow unknown clients;
+		#	deny known clients;
+		#}
+	}
+
+} #End of shared-network MtGab-uBR
+
+## CLARA ###
+
+shared-network Clara3-uBR {
+
+## MTA GiAddr
+subnet 172.20.48.0 netmask 255.255.252.0 {}
+
+## CM 22-05-15 Reduced lease time in prep to move to DHCP 233 and enable cable source-verify dhcp
+## CM 13-Oct-18 Had to activate this range due to changing P2P clients to DHCP. Public IP exhausted
+        subnet 192.168.162.0 netmask 255.255.254.0 {
+#               option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option domain-name-servers 8.8.8.8, 212.113.0.3;
+                option routers 192.168.162.1; ## On the Clara uBR
+                option broadcast-address 192.168.163.255;
+                default-lease-time 90000;
+                max-lease-time 90000;
+###
+### 150518 ROL Private Pool Removed
+###
+                #pool {
+                #       range 192.168.162.20 192.168.162.31;
+                #       allow unknown clients;
+                #       deny known clients;
+		#       deny all clients;
+                #}
+        }
+
+	subnet 185.11.67.96 netmask 255.255.255.224 {  ### Note range 185.11.67.69 - 185.11.67.95 is for White Bridged!       
+		option domain-name-servers 8.8.8.8, 212.113.0.3;
+		option routers 185.11.67.97; ## On clara ubr bundle 1	
+		option broadcast-address 185.11.67.127;
+		default-lease-time 90000;
+		max-lease-time 90000;
+		pool {
+			range 185.11.67.98 185.11.67.126;
+			allow unknown clients;
+			deny known clients;
+#			deny all clients;
+		}
+	}
+	
+        ## PTP Links
+        subnet 10.1.10.192 netmask 255.255.255.224 {
+                option domain-name-servers 8.8.8.8, 212.113.0.3;
+                option routers 10.1.10.194; ## On the Clara uBR
+                option broadcast-address 10.1.10.255;
+                default-lease-time 90000;
+                max-lease-time 90000;
+                include "/etc/dhcp/clara_10.1.10.classes";
+                }
+
+        subnet 81.31.211.0 netmask 255.255.255.0 {
+                option domain-name-servers 8.8.8.8, 212.113.0.3;
+                option routers 81.31.211.1; ## On the Clara uBR
+                option broadcast-address 81.31.211.255;
+                default-lease-time 90000;
+                max-lease-time 90000;
+                pool {
+                        range 81.31.211.6 81.31.211.254; ## CM increased pool by 2
+                        allow unknown clients;
+                        deny known clients;
+#			deny all clients;
+                }
+        }
+
+        ### Clara Static Public IP assignments for MTA Modem Customers
+        subnet 88.151.25.224 netmask 255.255.255.224 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 88.151.25.225; ## On the Clara uBR
+                option broadcast-address 88.151.25.255;
+                default-lease-time 90000;
+                max-lease-time 90000;
+		include "/etc/dhcp/clara_88.151.25.classes";
+        }
+} #End of shared-network Clara-uBR
+
+
+## CM 19/12/16 New Clara4 Subnet
+
+shared-network Clara4-uBR {
+
+subnet 192.168.41.0 netmask 255.255.255.0 {} ## Clara4 GiAddr
+
+
+### Static Hosts
+#
+subnet 37.128.196.176 netmask 255.255.255.240 {
+                option domain-name-servers 8.8.8.8, 212.113.0.3;
+                option routers 37.128.196.177;
+                option broadcast-address  37.128.196.191;
+                default-lease-time 90000;
+                max-lease-time 90000;
+		include "/etc/dhcp/clara4_37.128.196.classes";
+}
+
+
+subnet 37.128.196.192 netmask 255.255.255.224 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 37.128.196.193; ## On Clara4 int bu 1
+                option broadcast-address 37.128.196.223;
+                default-lease-time 90000;
+                max-lease-time 90000;
+                pool {
+                        range 37.128.196.195 37.128.196.222;
+                        allow unknown clients;
+                        deny known clients;
+                        #deny all clients;
+		}
+	}
+
+subnet 81.31.209.0 netmask 255.255.255.128 {  
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 81.31.209.1; ## On Clara4 int bu 1
+                option broadcast-address 81.31.209.128;
+                default-lease-time 90000;
+                max-lease-time 90000;
+                pool {
+                        range 81.31.209.5 81.31.209.127;
+                        allow unknown clients;
+                        deny known clients;
+                        #deny all clients;
+		}
+	}
+
+subnet 81.31.209.192 netmask 255.255.255.192 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 81.31.209.193; ## On Clara4 int bu 1
+                option broadcast-address 81.31.209.255;
+                default-lease-time 90000;
+                max-lease-time 90000;
+                pool {
+                        range 81.31.209.195 81.31.209.254;
+                        allow unknown clients;
+                        deny known clients;
+			#deny all clients;
+		}
+	}
+
+subnet 88.151.28.224 netmask 255.255.255.224 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 88.151.28.225; ## On Clara4 int bu 1
+                option broadcast-address 88.151.28.255;
+                default-lease-time 90000;
+                max-lease-time 90000;
+                pool {
+                        range 88.151.28.227 88.151.28.254;
+                        allow unknown clients;
+                        deny known clients;
+                        #deny all clients;
+                }
+        }
+} ## End shared-network Clara4-uBR
+
+
+
+### BALLINGARRY ###
+
+shared-network Ballingarry-uBR {
+# CM 1308020@1041  Removed pool for testing new pub range
+# ROL 150511 Removed pool as added public 31.186.33.192/26
+# CM  150515 New GiAddr is 172.20.72.1 which is same as MTAs so I declare this subnet below without a pool
+# #
+subnet 172.20.72.0 netmask 255.255.252.0 {}
+subnet 172.22.80.0 netmask 255.255.255.0 {}
+
+	# CM 160525 Private subnet for PtP
+
+
+	subnet 10.1.14.0 netmask 255.255.255.0 {
+		option domain-name-servers 8.8.8.8, 212.113.0.3;
+                option routers 88.151.25.129;
+                option broadcast-address 88.151.25.159;
+                default-lease-time 90000;
+                max-lease-time 90000;	
+		include "/etc/dhcp/balling10.1.14.0.classes";
+	}
+
+
+        # CM 130820 New subnet rolled out
+        subnet 88.151.25.128 netmask 255.255.255.224 {
+                option domain-name-servers 8.8.8.8, 212.113.0.3;
+                option routers 88.151.25.129;
+                option broadcast-address 88.151.25.159;
+                default-lease-time 90000;
+                max-lease-time 90000;
+                 pool {
+                         range 88.151.25.134 88.151.25.158;
+#                        deny all clients;
+                         allow unknown clients;
+                        deny known clients;
+
+                }
+        }
+
+        # CM 130821 New subnet rolled out
+        subnet 88.151.27.208 netmask 255.255.255.240 {
+                option domain-name-servers 8.8.8.8, 212.113.0.3;
+                option routers 88.151.27.209;
+                option broadcast-address 88.151.27.223;
+                default-lease-time 90000;
+                max-lease-time 90000;
+                include "/etc/dhcp/balling8815127.classes";
+                 pool {
+                         range 88.151.27.213 88.151.27.220;
+#                        deny all clients;
+                         allow unknown clients;
+                         deny known clients;
+                }
+        }
+
+# 8-Aug-13 ROL added 185.11.67/25
+
+        subnet 185.11.67.128 netmask 255.255.255.128 {
+                option domain-name-servers 8.8.8.8, 212.113.0.3;
+                option routers 185.11.67.129;
+                option broadcast-address 185.11.67.255;
+                default-lease-time 90000;
+                max-lease-time 90000;
+
+                pool {
+                range 185.11.67.132 185.11.67.254;
+#                        deny all clients;
+                        allow unknown clients;
+                        deny known clients;
+                }
+        }
+
+        subnet 88.151.26.128 netmask 255.255.255.192 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 88.151.26.129;
+                option broadcast-address 88.151.26.191;
+                default-lease-time 90000;
+                max-lease-time 90000;
+                include "/etc/dhcp/balling.classes";
+                pool {
+                        range 88.151.26.158 88.151.26.190; ## Static is .136 to .156
+#                        deny all clients;
+                        allow unknown clients;
+                        deny known clients;
+                }
+        }
+
+
+## CM 14-04-17 To replace 31.186.33.0 
+	subnet 185.11.64.192 netmask 255.255.255.192 {
+		option domain-name-servers 8.8.8.8, 8.8.4.4;
+		option routers 185.11.64.193;
+		option broadcast-address 185.11.64.255;
+		default-lease-time 90000;
+		max-lease-time 90000;
+		pool {
+			range 185.11.64.196 185.11.64.254;
+			allow unknown clients;
+			deny known clients;
+			#deny all clients;
+		}
+	}
+
+#
+## CM 14-04-17 31.186.33.0 being removed from the network
+# 11-May-2015 ROL added in new subnet 31.186.33.192/26
+#
+        subnet 31.186.33.192 netmask 255.255.255.192 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 31.186.33.193;
+                option broadcast-address 31.186.33.255;
+                default-lease-time 90000;
+                max-lease-time 90000;
+                #pool {
+                #        range 31.186.33.196 31.186.33.254;
+#               #         deny all clients;
+                #        allow unknown clients;
+                #        deny known clients;
+                #}
+        }
+
+### 12-Nov-15 ROL added this subnet.
+        subnet 81.31.213.128 netmask 255.255.255.224 {
+                option domain-name-servers 8.8.8.8, 212.113.0.3;
+                option routers 81.31.213.129;
+                option broadcast-address 81.31.213.159;
+                default-lease-time 90000;
+                max-lease-time 90000;
+                pool {
+                        range 81.31.213.133 81.31.213.158;
+                        deny known clients;
+                        allow unknown clients;
+#                        deny all clients;
+                }
+        }
+
+
+} # End shared-network Ballingarry-uBR
+
+### Tknock5 ###
+
+shared-network Tknock-uBR5 {
+
+subnet 172.21.64.0 netmask 255.255.255.0 {}
+
+## CM 12-04-17 New subnet 185.11.66.0/25 to replace everything. Statics need to be here too. First 10 addresses reserved
+	subnet 185.11.66.0 netmask 255.255.255.128 {
+		option domain-name-servers 8.8.8.8, 8.8.4.4;
+		option routers 185.11.66.1; ## On uBR
+		option broadcast-address 185.11.66.128;	
+#		default-lease-time 3600;
+#                max-lease-time 3600;
+		default-lease-time 90000;
+                max-lease-time 90000;
+		include "/etc/dhcp/Tknock_185.11.66.classes";
+		pool {
+			range 185.11.66.10 185.11.66.127; ## First 10 are for static
+			allow unknown clients;
+                        deny known clients;
+                        #deny all clients;
+		}
+	}
+	
+} ## END shared-network Tknock-uBR5 
+
+shared-network wmtn6-uBR {
+
+subnet 172.21.98.0 netmask 255.255.255.0 {}
+
+## CM 12-04-17 Replacing /28s with 1 /26
+#
+
+	subnet 81.31.212.0 netmask 255.255.255.192 {
+		option domain-name-servers 8.8.8.8, 212.113.0.3;
+		option routers 81.31.212.1;  ## on the uBR
+		option broadcast-address 81.31.212.63;
+		default-lease-time 90000; ##
+		max-lease-time 90000;
+		pool {
+			range 81.31.212.2 81.31.212.62;
+			allow unknown clients;
+			deny known clients;
+			#deny all clients;
+		}
+	}
+
+## CM 13-04-17 1725hrs not needed
+		subnet 81.31.209.128 netmask 255.255.255.224 {
+                option domain-name-servers 8.8.8.8, 212.113.0.3;
+                option routers 81.31.209.129; ## On the uBR
+                option broadcast-address  81.31.209.159;
+                default-lease-time 90000;
+                max-lease-time 90000;
+                #pool {
+                #        range 81.31.209.130 81.31.209.158; ## CM 12-04-17 reduced to /27 pool change Mask on 13/4/17
+                #        #range 81.31.209.130 81.31.209.190;  
+                #        allow unknown clients;
+                #        deny known clients;
+	#		#deny all clients;
+                #}
+        }
+} #End of shared-network wmtn6-uBR
+
+shared-network johns2-uBR {
+
+subnet 172.22.75.0 netmask 255.255.255.0 {} ## CM this is the GiAddr
+
+	 subnet 192.168.208.0 netmask 255.255.252.0 {
+#                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option domain-name-servers 8.8.8.8, 212.113.0.3;
+                option routers 192.168.208.2;
+                option broadcast-address 192.168.211.255;
+                default-lease-time 90000;
+                max-lease-time 90000;
+                #pool {
+                #       range 192.168.208.65 192.168.208.85;
+                #      allow unknown clients;
+                #}
+        }
+
+        subnet 88.151.24.0 netmask 255.255.255.192 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 88.151.24.1;
+                option broadcast-address 88.151.24.63;
+                default-lease-time 90000;
+                max-lease-time 90000;
+                pool {
+                        range 88.151.24.5 88.151.24.62;
+                        allow unknown clients;
+                        deny known clients;
+                }
+        }
+
+## CM 141014 New subnet 185.11.65.48/28
+        subnet 185.11.65.48 netmask 255.255.255.240 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 185.11.65.49;   ## On WAN2
+                option broadcast-address 185.11.65.63;
+                default-lease-time 90000;
+                max-lease-time 90000;
+                pool {
+                        range 185.11.65.53 185.11.65.62;  ## 51, 52 reserved
+                        allow unknown clients;
+                        deny known clients;
+                }
+        }
+
+
+        ## CM Static Hosts.
+        subnet 88.151.27.176 netmask 255.255.255.240 {
+                option domain-name-servers 8.8.8.8, 8.8.4.4;
+                option routers 88.151.27.177;
+                option broadcast-address 88.151.27.191;
+                default-lease-time 90000;
+                max-lease-time 90000;
+                include "/etc/dhcp/johns.classes";
+        }
+} ## End of hared-network johns2-uBR
+#### END of dhcpd.conf  
